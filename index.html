@@ -1,532 +1,1594 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Anvil & Ink Workspace // Premium Offline Suite</title>
-    
-    <!-- Alpine.js -->
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- LocalForage -->
-    <script src="https://cdn.jsdelivr.net/npm/localforage@1.10.0/dist/localforage.min.js"></script>
-    <!-- Fuse.js -->
-    <script src="https://cdn.jsdelivr.net/npm/fuse.js@7.0.0/dist/fuse.basic.min.js"></script>
-    <!-- PDF-Lib -->
-    <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
-    <!-- PDF.js (For Rendering Interactive Previews) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
-    <!-- Cropper.js -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cropperjs@1.6.1/dist/cropper.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/cropperjs@1.6.1/dist/cropper.min.js"></script>
-    <!-- SheetJS -->
-    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <!-- Rough.js (Hand-drawn Canvas UI Elements) -->
-    <script src="https://cdn.jsdelivr.net/npm/roughjs@4.6.6/bundled/rough.js"></script>
-    <!-- Tesseract.js (Pure Client-Side OCR) -->
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.0.5/dist/tesseract.min.js"></script>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Anvil &amp; Ink Workspace — Offline Document Studio</title>
 
-    <style>
-        [x-cloak] { display: none !important; }
-        body { background-color: #0b0f17; background-image: radial-gradient(circle at top right, rgba(16, 185, 129, 0.05), transparent); }
-        .glass-panel { background: rgba(17, 24, 39, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.05); }
-        .pdf-container-scroll { max-height: 600px; overflow: auto; position: relative; }
-        #pdfRenderCanvas { cursor: crosshair; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
-    </style>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+<!-- Core libraries, loaded synchronously to guarantee availability -->
+<script src="https://cdn.jsdelivr.net/npm/localforage@1.10.0/dist/localforage.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/fuse.js@7.0.0/dist/fuse.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/cropperjs@1.5.13/dist/cropper.min.js"></script>
+<link href="https://cdn.jsdelivr.net/npm/cropperjs@1.5.13/dist/cropper.min.css" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/roughjs@4.6.6/bundled/rough.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.0.4/dist/tesseract.min.js"></script>
+
+<style>
+  :root {
+    --bg: #0b0f17;
+    --bg-2: #0d1320;
+    --card: rgba(17, 24, 39, 0.7);
+    --card-strong: rgba(13, 17, 25, 0.85);
+    --border: rgba(255, 255, 255, 0.05);
+    --border-strong: rgba(255, 255, 255, 0.08);
+    --emerald: #10b981;
+    --teal: #14b8a6;
+    --text: #e2e8f0;
+    --text-muted: #94a3b8;
+  }
+
+  * { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+
+  html, body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background-color: var(--bg);
+    color: var(--text);
+    letter-spacing: -0.01em;
+  }
+
+  body {
+    min-height: 100vh;
+    background-image:
+      radial-gradient(ellipse 80% 60% at 12% 10%, rgba(16, 185, 129, 0.10) 0%, transparent 55%),
+      radial-gradient(ellipse 70% 50% at 88% 92%, rgba(20, 184, 166, 0.08) 0%, transparent 55%),
+      radial-gradient(ellipse 50% 40% at 50% 50%, rgba(45, 212, 191, 0.03) 0%, transparent 60%);
+    background-attachment: fixed;
+  }
+
+  .font-mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+
+  .glass {
+    background: var(--card);
+    backdrop-filter: blur(12px) saturate(140%);
+    -webkit-backdrop-filter: blur(12px) saturate(140%);
+    border: 1px solid var(--border);
+  }
+  .glass-strong {
+    background: var(--card-strong);
+    backdrop-filter: blur(20px) saturate(160%);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    border: 1px solid var(--border-strong);
+  }
+
+  .accent-gradient { background: linear-gradient(135deg, #10b981 0%, #14b8a6 100%); }
+  .accent-text {
+    background: linear-gradient(135deg, #10b981 0%, #14b8a6 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, #10b981 0%, #14b8a6 100%);
+    color: white;
+    font-weight: 500;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 1px 2px rgba(16, 185, 129, 0.18), 0 4px 12px rgba(16, 185, 129, 0.12);
+  }
+  .btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(16, 185, 129, 0.28), 0 10px 22px rgba(16, 185, 129, 0.22);
+  }
+  .btn-primary:active { transform: translateY(0); }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
+
+  .btn-secondary {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: var(--text);
+    transition: all 0.2s ease;
+  }
+  .btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.07);
+    border-color: rgba(16, 185, 129, 0.3);
+  }
+
+  .tab-btn {
+    background: transparent;
+    color: var(--text-muted);
+    border: 1px solid transparent;
+    transition: all 0.25s ease;
+  }
+  .tab-btn:hover { color: var(--text); background: rgba(255, 255, 255, 0.03); }
+  .tab-active {
+    background: rgba(16, 185, 129, 0.10);
+    color: #10b981;
+    border-color: rgba(16, 185, 129, 0.25);
+    box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.1), 0 4px 16px rgba(16, 185, 129, 0.06);
+  }
+
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.02); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb { background: rgba(16, 185, 129, 0.22); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(16, 185, 129, 0.4); }
+
+  input[type="text"], input[type="search"], input[type="number"], textarea, select {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: var(--text);
+    transition: all 0.2s ease;
+    border-radius: 8px;
+  }
+  input:focus, textarea:focus, select:focus {
+    outline: none;
+    border-color: rgba(16, 185, 129, 0.5);
+    background: rgba(255, 255, 255, 0.05);
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.12);
+  }
+  input::placeholder, textarea::placeholder { color: rgba(148, 163, 184, 0.5); }
+
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 2px;
+    outline: none;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #10b981, #14b8a6);
+    cursor: pointer;
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #10b981, #14b8a6);
+    cursor: pointer;
+    border: none;
+  }
+
+  @keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5), 0 0 12px rgba(16, 185, 129, 0.6); }
+    50% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0), 0 0 16px rgba(16, 185, 129, 0.8); }
+  }
+  .pulse-glow { animation: pulse-glow 2s infinite; }
+
+  @keyframes fade-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .fade-in { animation: fade-in 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spinner {
+    border: 2px solid rgba(16, 185, 129, 0.18);
+    border-top-color: #10b981;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    display: inline-block;
+  }
+
+  .pdf-marker {
+    position: absolute;
+    width: 22px;
+    height: 22px;
+    border: 2px solid #10b981;
+    border-radius: 50%;
+    background: rgba(16, 185, 129, 0.18);
+    box-shadow: 0 0 14px rgba(16, 185, 129, 0.7), inset 0 0 6px rgba(16, 185, 129, 0.4);
+    pointer-events: none;
+    transform: translate(-50%, -50%);
+    z-index: 5;
+  }
+  .pdf-marker::before {
+    content: '';
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 4px; height: 4px;
+    background: #10b981;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 6px #10b981;
+  }
+
+  .drop-zone {
+    transition: all 0.3s ease;
+    border: 2px dashed rgba(255, 255, 255, 0.1);
+  }
+  .drop-zone.dragover {
+    border-color: #10b981;
+    background: rgba(16, 185, 129, 0.07);
+    transform: scale(1.005);
+  }
+
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+  .status-online { background: #10b981; box-shadow: 0 0 10px #10b981; }
+  .status-offline { background: #f59e0b; box-shadow: 0 0 10px #f59e0b; }
+
+  /* Cropper.js dark theme overrides */
+  .cropper-container { background: rgba(0, 0, 0, 0.4); border-radius: 8px; }
+  .cropper-line, .cropper-point { background-color: #10b981 !important; }
+  .cropper-view-box { outline-color: #10b981 !important; }
+  .cropper-point.point-se, .cropper-point.point-sw, .cropper-point.point-nw, .cropper-point.point-ne {
+    background-color: #10b981 !important;
+  }
+
+  [x-cloak] { display: none !important; }
+
+  .table-row:hover { background: rgba(16, 185, 129, 0.04); }
+  .table-row { transition: background 0.15s ease; border-bottom: 1px solid rgba(255, 255, 255, 0.03); }
+
+  .note-list-item.active {
+    background: rgba(16, 185, 129, 0.10);
+    border-color: rgba(16, 185, 129, 0.25);
+  }
+
+  .grain {
+    position: fixed; inset: 0; pointer-events: none; z-index: 1;
+    opacity: 0.025;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  /* Sticky pdf canvas wrap so markers can position absolutely */
+  .pdf-canvas-wrap {
+    position: relative;
+    display: inline-block;
+    max-width: 100%;
+    overflow: auto;
+    border-radius: 10px;
+    background: rgba(0,0,0,0.3);
+    padding: 12px;
+    border: 1px solid rgba(255,255,255,0.04);
+  }
+  #pdfCanvas { display: block; box-shadow: 0 10px 40px rgba(0,0,0,0.5); border-radius: 4px; }
+
+  /* Notes textarea sits over rough canvas */
+  .notepad-wrap { position: relative; }
+  .notepad-canvas { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
+  .notepad-textarea { position: relative; z-index: 1; background: transparent; }
+
+  kbd {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+    color: #cbd5e1;
+  }
+</style>
 </head>
-<body class="text-gray-100 min-h-screen font-sans antialiased selection:bg-emerald-500/30" x-data="app()" x-init="initApp()">
+<body class="min-h-screen">
+<div class="grain"></div>
 
-    <!-- Premium Native Utility Header -->
-    <header class="border-b border-gray-800/60 bg-gray-950/80 backdrop-blur-md p-4 sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-            <div class="flex items-center gap-3">
-                <div class="h-10 w-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center shadow-lg shadow-emerald-500/10">
-                    <span class="text-lg font-bold text-gray-950">🖋️</span>
-                </div>
-                <div>
-                    <h1 class="text-lg font-bold tracking-tight bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent">Anvil & Ink</h1>
-                    <p class="text-xs font-medium text-gray-500">Premium Local Workstation // 100% Secure</p>
-                </div>
-            </div>
-            <nav class="flex space-x-1 p-1 rounded-xl bg-gray-900/60 border border-gray-800/60 shadow-inner">
-                <button @click="activeTab = 'pdf'" :class="activeTab === 'pdf' ? 'bg-emerald-500 text-gray-950 shadow-md shadow-emerald-500/20 font-semibold' : 'text-gray-400 hover:text-gray-200'" class="px-4 py-2 rounded-lg text-xs transition duration-200">📝 PDF Visual Signer</button>
-                <button @click="activeTab = 'excel'" :class="activeTab === 'excel' ? 'bg-emerald-500 text-gray-950 shadow-md shadow-emerald-500/20 font-semibold' : 'text-gray-400 hover:text-gray-200'" class="px-4 py-2 rounded-lg text-xs transition duration-200">📊 Data Engine</button>
-                <button @click="activeTab = 'cropper'" :class="activeTab === 'cropper' ? 'bg-emerald-500 text-gray-950 shadow-md shadow-emerald-500/20 font-semibold' : 'text-gray-400 hover:text-gray-200'" class="px-4 py-2 rounded-lg text-xs transition duration-200">✂️ Studio Crop</button>
-                <button @click="activeTab = 'notes'" :class="activeTab === 'notes' ? 'bg-emerald-500 text-gray-950 shadow-md shadow-emerald-500/20 font-semibold' : 'text-gray-400 hover:text-gray-200'" class="px-4 py-2 rounded-lg text-xs transition duration-200" @click.debounce.50ms="drawSketchUI()">📓 Sketch Notes & OCR</button>
-            </nav>
+<div x-data="anvilWorkspace()" x-init="init()" x-cloak class="relative z-10">
+
+  <!-- ============== HEADER ============== -->
+  <header class="sticky top-0 z-40 glass-strong border-b border-white/5">
+    <div class="max-w-[1400px] mx-auto px-6 py-4 flex items-center justify-between gap-6">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl accent-gradient flex items-center justify-center shadow-lg shadow-emerald-500/20">
+          <svg viewBox="0 0 24 24" fill="none" class="w-6 h-6 text-white" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 21h18"/>
+            <path d="M5 21V10l4-3h6l4 3v11"/>
+            <path d="M9 21v-6h6v6"/>
+            <path d="M9 4c0 1 1 2 3 2s3-1 3-2"/>
+          </svg>
         </div>
-    </header>
+        <div>
+          <h1 class="text-lg font-semibold tracking-tight leading-tight">Anvil &amp; Ink <span class="accent-text">Workspace</span></h1>
+          <p class="text-[11px] text-slate-400 font-mono uppercase tracking-wider">Offline Document Studio</p>
+        </div>
+      </div>
 
-    <main class="max-w-7xl mx-auto p-4 md:p-8">
+      <nav class="hidden md:flex items-center gap-1">
+        <template x-for="tab in tabs" :key="tab.id">
+          <button @click="setTab(tab.id)"
+                  :class="activeTab === tab.id ? 'tab-active' : 'tab-btn'"
+                  class="px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2">
+            <span x-html="tab.icon" class="w-4 h-4 inline-flex"></span>
+            <span x-text="tab.label"></span>
+          </button>
+        </template>
+      </nav>
 
-        <!-- ==================== TAB 1: VISUAL INTERACTIVE PDF SIGNER ==================== -->
-        <section x-show="activeTab === 'pdf'" x-cloak class="grid grid-cols-1 lg:grid-cols-4 gap-8">
-            <div class="lg:col-span-1 space-y-6">
-                <div class="glass-panel p-5 rounded-2xl shadow-xl space-y-4">
-                    <h2 class="text-sm font-bold uppercase tracking-wider text-emerald-400">1. Source Assets</h2>
-                    <div>
-                        <label class="block text-xs font-medium text-gray-400 mb-1.5">Document File</label>
-                        <input type="file" accept=".pdf" @change="loadPdfPreview" class="block w-full text-xs text-gray-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-500/10 file:text-emerald-400 hover:file:bg-emerald-500/20 cursor-pointer" />
-                    </div>
-                    <div>
-                        <label class="block text-xs font-medium text-gray-400 mb-1.5">Stamp/Signature Image</label>
-                        <input type="file" accept="image/*" @change="handlePdfSignatureUpload" class="block w-full text-xs text-gray-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-500/10 file:text-emerald-400 hover:file:bg-emerald-500/20 cursor-pointer" />
-                    </div>
+      <div class="flex items-center gap-3">
+        <div class="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg glass text-xs">
+          <span :class="online ? 'status-online' : 'status-offline'" class="status-dot"></span>
+          <span class="text-slate-300 font-mono" x-text="online ? 'Online' : 'Offline'"></span>
+        </div>
+        <div class="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-lg glass text-xs">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="w-3.5 h-3.5 text-emerald-400">
+            <path d="M12 2L4 6v6c0 5 3.5 9.5 8 10 4.5-.5 8-5 8-10V6l-8-4z"/>
+          </svg>
+          <span class="text-slate-300 font-mono" x-text="swStatus"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mobile tabs -->
+    <div class="md:hidden border-t border-white/5 px-4 py-2 flex gap-1 overflow-x-auto">
+      <template x-for="tab in tabs" :key="tab.id">
+        <button @click="setTab(tab.id)"
+                :class="activeTab === tab.id ? 'tab-active' : 'tab-btn'"
+                class="px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap flex items-center gap-1.5">
+          <span x-html="tab.icon" class="w-3.5 h-3.5 inline-flex"></span>
+          <span x-text="tab.label"></span>
+        </button>
+      </template>
+    </div>
+  </header>
+
+  <main class="max-w-[1400px] mx-auto px-4 sm:px-6 py-8">
+
+    <!-- ================== PDF SIGNER ================== -->
+    <section x-show="activeTab === 'pdf'" class="fade-in space-y-6">
+      <div class="flex items-start justify-between flex-wrap gap-4">
+        <div>
+          <h2 class="text-2xl font-semibold tracking-tight">Visual PDF Signer</h2>
+          <p class="text-sm text-slate-400 mt-1">Click anywhere on the rendered page to drop a pin. We bake your signature into native PDF coordinates.</p>
+        </div>
+        <div class="flex gap-2">
+          <label class="btn-secondary px-4 py-2.5 rounded-lg text-sm cursor-pointer flex items-center gap-2">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="w-4 h-4"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+            Load PDF
+            <input type="file" accept="application/pdf" class="hidden" @change="handlePdfUpload($event)" />
+          </label>
+          <button @click="exportSignedPdf()" :disabled="pdfExporting || !pdfDoc" class="btn-primary px-4 py-2.5 rounded-lg text-sm flex items-center gap-2">
+            <span x-show="!pdfExporting" class="flex items-center gap-2">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="w-4 h-4"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+              Export Signed PDF
+            </span>
+            <span x-show="pdfExporting" class="flex items-center gap-2">
+              <span class="spinner w-4 h-4"></span> Baking…
+            </span>
+          </button>
+        </div>
+      </div>
+
+      <div class="grid lg:grid-cols-[1fr_360px] gap-6">
+        <!-- PDF Canvas -->
+        <div class="glass rounded-2xl p-5 min-h-[600px] flex flex-col">
+          <template x-if="!pdfDoc">
+            <div class="flex-1 flex items-center justify-center">
+              <div class="drop-zone rounded-xl p-12 text-center max-w-md cursor-pointer"
+                   @click="$refs.pdfFileInput.click()"
+                   @dragover.prevent="dropZoneOver = true" @dragleave.prevent="dropZoneOver = false"
+                   @drop.prevent="handlePdfDrop($event)"
+                   :class="dropZoneOver ? 'dragover' : ''">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" class="w-14 h-14 mx-auto text-emerald-400/70 mb-4">
+                  <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                  <path d="M14 2v6h6M9 13h6M9 17h6"/>
+                </svg>
+                <h3 class="text-lg font-medium">Drop a PDF here</h3>
+                <p class="text-sm text-slate-400 mt-1">or click to browse · stays 100% local</p>
+                <input type="file" x-ref="pdfFileInput" accept="application/pdf" class="hidden" @change="handlePdfUpload($event)" />
+              </div>
+            </div>
+          </template>
+
+          <template x-if="pdfDoc">
+            <div class="flex-1 flex flex-col">
+              <!-- Page controls -->
+              <div class="flex items-center justify-between mb-4 gap-4 flex-wrap">
+                <div class="flex items-center gap-2">
+                  <button @click="prevPage()" :disabled="pdfPageNum <= 1" class="btn-secondary p-2 rounded-lg disabled:opacity-40">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-4 h-4"><path d="M15 18l-6-6 6-6"/></svg>
+                  </button>
+                  <div class="px-3 py-1.5 rounded-lg glass text-sm font-mono">
+                    <span x-text="pdfPageNum"></span> / <span x-text="pdfTotalPages"></span>
+                  </div>
+                  <button @click="nextPage()" :disabled="pdfPageNum >= pdfTotalPages" class="btn-secondary p-2 rounded-lg disabled:opacity-40">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-4 h-4"><path d="M9 18l6-6-6-6"/></svg>
+                  </button>
                 </div>
-
-                <div x-show="pdfFileLoaded" class="glass-panel p-5 rounded-2xl shadow-xl space-y-4" x-transition>
-                    <h2 class="text-sm font-bold uppercase tracking-wider text-emerald-400">2. Stamp Attributes</h2>
-                    <div>
-                        <label class="block text-xs text-gray-400 mb-1">Text String</label>
-                        <input type="text" x-model="pdfOverlayText" class="w-full bg-gray-900/80 border border-gray-800 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500" placeholder="e.g. APPROVED" />
-                    </div>
-                    <div class="grid grid-cols-2 gap-2 text-xs text-gray-400">
-                        <div>Target X: <span class="text-white font-mono" x-text="pdfX"></span></div>
-                        <div>Target Y: <span class="text-white font-mono" x-text="pdfY"></span></div>
-                    </div>
-                    <p class="text-[10px] text-gray-500 italic">💡 Click directly anywhere on the right viewport canvas to lock coordinates instantly.</p>
-                    <button @click="generateSignedPdf" class="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-gray-950 font-bold py-2.5 px-4 rounded-xl text-xs shadow-lg shadow-emerald-500/10 transition duration-200">
-                        Export & Download PDF
-                    </button>
+                <div class="flex items-center gap-2">
+                  <label class="text-xs text-slate-400 font-mono">ZOOM</label>
+                  <input type="range" min="0.6" max="2.4" step="0.1" x-model.number="pdfScale" @input="renderPdfPage()" class="w-32" />
+                  <span class="text-xs font-mono text-slate-300 w-10" x-text="pdfScale.toFixed(1)+'×'"></span>
                 </div>
+                <button @click="clearPdfMarkers()" class="btn-secondary px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="w-3.5 h-3.5"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
+                  Clear Pins (<span x-text="pdfClickPoints.filter(p => p.pageNum === pdfPageNum).length"></span>)
+                </button>
+              </div>
+
+              <!-- Canvas + markers -->
+              <div class="flex-1 overflow-auto rounded-xl bg-black/20 p-4 flex items-start justify-center">
+                <div class="pdf-canvas-wrap" x-ref="pdfCanvasWrap">
+                  <canvas id="pdfCanvas" x-ref="pdfCanvas" @click="handlePdfCanvasClick($event)"></canvas>
+                  <template x-for="(marker, idx) in pdfClickPoints.filter(p => p.pageNum === pdfPageNum)" :key="idx">
+                    <div class="pdf-marker pulse-glow"
+                         :style="`left: ${marker.cssX + 12}px; top: ${marker.cssY + 12}px;`"
+                         @click.stop="removeMarker(marker)"></div>
+                  </template>
+                </div>
+              </div>
+              <p class="text-xs text-slate-500 mt-3 text-center">
+                Click on the page to drop a pin · click an existing pin to remove it · pins only bake at export time
+              </p>
+            </div>
+          </template>
+        </div>
+
+        <!-- Signature controls -->
+        <div class="glass rounded-2xl p-5 space-y-5">
+          <div>
+            <h3 class="text-sm font-semibold uppercase tracking-wider text-slate-300 mb-3">Signature Source</h3>
+            <div class="grid grid-cols-2 gap-2">
+              <button @click="signatureMode = 'image'"
+                      :class="signatureMode === 'image' ? 'tab-active' : 'tab-btn'"
+                      class="px-3 py-2 rounded-lg text-sm border">Image</button>
+              <button @click="signatureMode = 'text'"
+                      :class="signatureMode === 'text' ? 'tab-active' : 'tab-btn'"
+                      class="px-3 py-2 rounded-lg text-sm border">Typed Text</button>
+            </div>
+          </div>
+
+          <!-- Image signature -->
+          <div x-show="signatureMode === 'image'" class="space-y-3">
+            <label class="btn-secondary w-full px-4 py-3 rounded-lg text-sm cursor-pointer flex items-center justify-center gap-2">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="w-4 h-4"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+              Upload Signature Image
+              <input type="file" accept="image/png,image/jpeg" class="hidden" @change="handleSignatureImageUpload($event)" />
+            </label>
+            <template x-if="signatureImage">
+              <div class="rounded-lg p-3 glass-strong flex items-center justify-center">
+                <img :src="signatureImage" alt="signature" class="max-h-24 object-contain" />
+              </div>
+            </template>
+            <div>
+              <label class="text-xs text-slate-400 font-mono flex justify-between">
+                <span>WIDTH (PDF pts)</span>
+                <span x-text="signatureWidth + 'pt'"></span>
+              </label>
+              <input type="range" min="40" max="320" step="5" x-model.number="signatureWidth" class="w-full" />
+            </div>
+          </div>
+
+          <!-- Text signature -->
+          <div x-show="signatureMode === 'text'" class="space-y-3">
+            <input type="text" x-model="signatureText" placeholder="Type your name…"
+                   class="w-full px-3 py-2.5 text-sm" />
+            <div>
+              <label class="text-xs text-slate-400 font-mono flex justify-between">
+                <span>FONT SIZE</span>
+                <span x-text="signatureFontSize + 'pt'"></span>
+              </label>
+              <input type="range" min="8" max="48" step="1" x-model.number="signatureFontSize" class="w-full" />
+            </div>
+            <div>
+              <label class="text-xs text-slate-400 font-mono block mb-1">COLOR</label>
+              <div class="flex gap-2">
+                <button @click="signatureColor = '#0a0a0a'" :style="`background:${signatureColor === '#0a0a0a' ? '#0a0a0a' : 'transparent'}`" class="w-7 h-7 rounded-md border-2 border-white/10" :class="signatureColor === '#0a0a0a' ? 'ring-2 ring-emerald-400' : ''" style="background:#0a0a0a"></button>
+                <button @click="signatureColor = '#1e3a8a'" class="w-7 h-7 rounded-md border-2 border-white/10" :class="signatureColor === '#1e3a8a' ? 'ring-2 ring-emerald-400' : ''" style="background:#1e3a8a"></button>
+                <button @click="signatureColor = '#7c2d12'" class="w-7 h-7 rounded-md border-2 border-white/10" :class="signatureColor === '#7c2d12' ? 'ring-2 ring-emerald-400' : ''" style="background:#7c2d12"></button>
+                <button @click="signatureColor = '#10b981'" class="w-7 h-7 rounded-md border-2 border-white/10" :class="signatureColor === '#10b981' ? 'ring-2 ring-emerald-400' : ''" style="background:#10b981"></button>
+              </div>
+            </div>
+          </div>
+
+          <div class="pt-3 border-t border-white/5">
+            <h3 class="text-sm font-semibold uppercase tracking-wider text-slate-300 mb-2">Pins Placed</h3>
+            <div class="text-2xl font-mono accent-text" x-text="pdfClickPoints.length"></div>
+            <p class="text-xs text-slate-500 mt-1">across <span x-text="new Set(pdfClickPoints.map(p=>p.pageNum)).size"></span> page(s)</p>
+          </div>
+
+          <div class="text-xs text-slate-500 font-mono leading-relaxed pt-3 border-t border-white/5">
+            <div class="flex justify-between"><span>Last click (PDF pts):</span></div>
+            <div class="text-slate-300" x-show="pdfClickPoints.length > 0">
+              X: <span x-text="pdfClickPoints[pdfClickPoints.length-1]?.x.toFixed(1)"></span>
+              · Y: <span x-text="pdfClickPoints[pdfClickPoints.length-1]?.y.toFixed(1)"></span>
+              · P:<span x-text="pdfClickPoints[pdfClickPoints.length-1]?.pageNum"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================== NOTES ================== -->
+    <section x-show="activeTab === 'notes'" class="fade-in space-y-6">
+      <div class="flex items-start justify-between flex-wrap gap-4">
+        <div>
+          <h2 class="text-2xl font-semibold tracking-tight">Quick Notes</h2>
+          <p class="text-sm text-slate-400 mt-1">Markdown-friendly scratchpad with hand-drawn edges. Persisted to IndexedDB · never leaves your machine.</p>
+        </div>
+        <div class="flex gap-2">
+          <label class="btn-secondary px-4 py-2.5 rounded-lg text-sm cursor-pointer flex items-center gap-2"
+                 :class="ocrProcessing ? 'opacity-60 pointer-events-none' : ''">
+            <svg x-show="!ocrProcessing" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="w-4 h-4"><path d="M3 7V5a2 2 0 012-2h2M17 3h2a2 2 0 012 2v2M21 17v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2"/><rect x="7" y="7" width="10" height="10" rx="1"/></svg>
+            <span x-show="ocrProcessing" class="spinner w-4 h-4"></span>
+            <span x-text="ocrProcessing ? 'OCR '+ocrProgress+'%' : 'Scan Image (OCR)'"></span>
+            <input type="file" accept="image/*" class="hidden" @change="handleOcrUpload($event)" :disabled="ocrProcessing" />
+          </label>
+          <button @click="newNote()" class="btn-primary px-4 py-2.5 rounded-lg text-sm flex items-center gap-2">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-4 h-4"><path d="M12 5v14M5 12h14"/></svg>
+            New Note
+          </button>
+        </div>
+      </div>
+
+      <div class="grid lg:grid-cols-[280px_1fr] gap-6">
+        <!-- Notes list -->
+        <aside class="glass rounded-2xl p-3 max-h-[70vh] overflow-y-auto">
+          <div class="text-xs uppercase tracking-wider text-slate-500 font-mono px-2 py-2">All Notes (<span x-text="notes.length"></span>)</div>
+          <template x-if="notes.length === 0">
+            <div class="text-center text-slate-500 text-sm py-8">No notes yet</div>
+          </template>
+          <div class="space-y-1.5">
+            <template x-for="note in notes" :key="note.id">
+              <button @click="selectNote(note.id)"
+                      :class="activeNoteId === note.id ? 'active' : ''"
+                      class="note-list-item w-full text-left p-3 rounded-lg border border-transparent hover:border-white/10 group">
+                <div class="text-sm font-medium truncate" x-text="note.title || 'Untitled'"></div>
+                <div class="text-xs text-slate-500 truncate mt-0.5" x-text="(note.content || '').slice(0, 60) || 'Empty note'"></div>
+                <div class="flex items-center justify-between mt-2">
+                  <span class="text-[10px] font-mono text-slate-500" x-text="formatDate(note.updatedAt)"></span>
+                  <button @click.stop="deleteNote(note.id)" class="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 transition">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" class="w-3.5 h-3.5"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
+                  </button>
+                </div>
+              </button>
+            </template>
+          </div>
+        </aside>
+
+        <!-- Note editor -->
+        <div class="glass rounded-2xl p-5">
+          <input type="text" x-model="noteTitle" @input="scheduleAutosave()"
+                 placeholder="Note title…"
+                 class="w-full px-3 py-2.5 text-xl font-semibold mb-4 bg-transparent border-0 border-b border-white/5 rounded-none focus:border-b focus:rounded-t-lg" />
+
+          <div class="notepad-wrap">
+            <canvas x-ref="roughCanvas" class="notepad-canvas" width="800" height="600"></canvas>
+            <textarea x-ref="noteContent" x-model="noteContent" @input="scheduleAutosave()"
+                      placeholder="Start writing… Markdown supported. Drop an OCR scan above to insert printed text."
+                      class="notepad-textarea w-full min-h-[400px] p-4 text-sm font-mono leading-relaxed resize-y"></textarea>
+          </div>
+
+          <div class="flex items-center justify-between mt-4 text-xs text-slate-500 font-mono">
+            <div class="flex items-center gap-3">
+              <span class="flex items-center gap-1.5">
+                <span :class="autosaveStatus === 'saved' ? 'status-online' : 'status-offline'" class="status-dot"></span>
+                <span x-text="autosaveStatus === 'saved' ? 'Saved to IndexedDB' : 'Saving…'"></span>
+              </span>
+              <span x-text="noteContent.length + ' chars'"></span>
+              <span x-text="noteContent.split(/\s+/).filter(Boolean).length + ' words'"></span>
+            </div>
+            <div class="flex items-center gap-2">
+              <kbd>⌘</kbd> <kbd>S</kbd> to force save
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================== SPREADSHEET ================== -->
+    <section x-show="activeTab === 'sheet'" class="fade-in space-y-6">
+      <div class="flex items-start justify-between flex-wrap gap-4">
+        <div>
+          <h2 class="text-2xl font-semibold tracking-tight">Spreadsheet Fuzzy Engine</h2>
+          <p class="text-sm text-slate-400 mt-1">Drop any Excel/CSV file · parsed in-memory by SheetJS · indexed by Fuse.js for typo-tolerant search.</p>
+        </div>
+        <div class="flex gap-2">
+          <label class="btn-secondary px-4 py-2.5 rounded-lg text-sm cursor-pointer flex items-center gap-2">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="w-4 h-4"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+            Load Spreadsheet
+            <input type="file" accept=".csv,.xlsx,.xls,.tsv" class="hidden" @change="handleSheetUpload($event)" />
+          </label>
+        </div>
+      </div>
+
+      <div class="glass rounded-2xl p-5">
+        <template x-if="sheetData.length === 0">
+          <div class="drop-zone rounded-xl p-12 text-center"
+               @click="$refs.sheetFileInput.click()"
+               @dragover.prevent="sheetDropOver = true" @dragleave.prevent="sheetDropOver = false"
+               @drop.prevent="handleSheetDrop($event)"
+               :class="sheetDropOver ? 'dragover' : ''">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" class="w-14 h-14 mx-auto text-emerald-400/70 mb-4">
+              <rect x="3" y="3" width="18" height="18" rx="2"/>
+              <path d="M3 9h18M3 15h18M9 3v18M15 3v18"/>
+            </svg>
+            <h3 class="text-lg font-medium">Drop a spreadsheet</h3>
+            <p class="text-sm text-slate-400 mt-1">.xlsx · .xls · .csv · .tsv · parsed locally</p>
+            <input type="file" x-ref="sheetFileInput" accept=".csv,.xlsx,.xls,.tsv" class="hidden" @change="handleSheetUpload($event)" />
+          </div>
+        </template>
+
+        <template x-if="sheetData.length > 0">
+          <div class="space-y-4">
+            <div class="flex items-center gap-3 flex-wrap">
+              <div class="flex-1 min-w-[240px] relative">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">
+                  <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+                </svg>
+                <input type="search" x-model="searchQuery" @input="performSearch()"
+                       placeholder="Fuzzy search across all columns… (typo-tolerant)"
+                       class="w-full pl-10 pr-4 py-2.5 text-sm" />
+              </div>
+              <div class="text-xs text-slate-400 font-mono px-3 py-2 glass rounded-lg">
+                <span x-text="searchResults.length"></span> / <span x-text="sheetData.length"></span> rows
+              </div>
+              <div class="text-xs text-slate-400 font-mono px-3 py-2 glass rounded-lg">
+                <span x-text="sheetHeaders.length"></span> columns
+              </div>
+              <button @click="clearSheet()" class="btn-secondary px-3 py-2 rounded-lg text-xs">Clear</button>
             </div>
 
-            <!-- Interactive Working Viewport Canvas -->
-            <div class="lg:col-span-3 flex flex-col items-center">
-                <div x-show="!pdfFileLoaded" class="w-full h-[500px] rounded-2xl border-2 border-dashed border-gray-800 flex flex-col items-center justify-center p-6 text-center">
-                    <span class="text-4xl mb-3 opacity-60">📄</span>
-                    <h3 class="text-sm font-semibold text-gray-300">No Document Mounted</h3>
-                    <p class="text-xs text-gray-500 max-w-xs mt-1">Upload a PDF file using the left panel controls to reveal interactive workspace viewports.</p>
-                </div>
-
-                <div x-show="pdfFileLoaded" class="w-full space-y-4 text-center" x-transition>
-                    <div class="inline-flex items-center gap-4 bg-gray-950 px-4 py-1.5 rounded-full border border-gray-800 text-xs">
-                        <button @click="changePdfPage(-1)" class="hover:text-emerald-400">◀ Prev</button>
-                        <span class="font-mono text-gray-400">Page <span class="text-white" x-text="pdfCurrentPage"></span> of <span class="text-white" x-text="pdfTotalPages"></span></span>
-                        <button @click="changePdfPage(1)" class="hover:text-emerald-400">Next ▶</button>
-                    </div>
-                    <div class="pdf-container-scroll bg-gray-950 rounded-2xl p-4 border border-gray-800 max-w-full flex justify-center shadow-2xl">
-                        <canvas id="pdfRenderCanvas" @click="captureCoordinates"></canvas>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- ==================== TAB 2: EXCEL FUZZY SEARCH ENGINE ==================== -->
-        <section x-show="activeTab === 'excel'" x-cloak class="space-y-6">
-            <div class="glass-panel p-6 rounded-2xl shadow-xl flex flex-col md:flex-row items-center justify-between gap-4">
-                <div>
-                    <h2 class="text-base font-bold text-emerald-400">Client-Side Structured Data Search Engine</h2>
-                    <p class="text-xs text-gray-400">Instant offline search and data query interface powered by SheetJS and Fuse.js.</p>
-                </div>
-                <input type="file" accept=".xlsx, .xls, .csv" @change="handleExcelUpload" class="text-xs text-gray-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-500/10 file:text-emerald-400 hover:file:bg-emerald-500/20 cursor-pointer" />
+            <div class="text-xs text-slate-500 font-mono">
+              File: <span class="text-slate-300" x-text="sheetFileName"></span>
             </div>
 
-            <div x-show="excelHeaders.length > 0" class="glass-panel p-6 rounded-2xl shadow-xl space-y-4" x-transition>
-                <input type="text" x-model="excelSearchQuery" @input="fuzzySearchExcel()" placeholder="Type to filter data dynamically (supports extreme typos)..." class="w-full bg-gray-900 border border-gray-800 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-500 shadow-inner" />
-                <div class="overflow-x-auto rounded-xl border border-gray-800 max-h-[400px]">
-                    <table class="w-full text-left border-collapse text-xs text-gray-300">
-                        <thead class="bg-gray-900 sticky top-0 text-gray-400 uppercase tracking-wider text-[10px] border-b border-gray-800">
-                            <tr>
-                                <template x-for="header in excelHeaders">
-                                    <th class="p-3" x-text="header"></th>
-                                </template>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-900">
-                            <template x-for="row in filteredExcelRows">
-                                <tr class="hover:bg-gray-900/40 transition">
-                                    <template x-for="header in excelHeaders">
-                                        <td class="p-3 whitespace-nowrap" x-text="row[header]"></td>
-                                    </template>
-                                </tr>
-                            </template>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </section>
-
-        <!-- ==================== TAB 3: IMAGE STUDIO OPTIMIZER ==================== -->
-        <section x-show="activeTab === 'cropper'" x-cloak class="space-y-6">
-            <div class="glass-panel p-6 rounded-2xl shadow-xl">
-                <h2 class="text-base font-bold text-emerald-400 mb-1">High-Precision Asset Cropper</h2>
-                <input type="file" accept="image/*" @change="loadImageForCropping" class="block w-full text-xs text-gray-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-emerald-500/10 file:text-emerald-400 hover:file:bg-emerald-500/20 cursor-pointer" />
-            </div>
-
-            <div x-show="imageSelected" class="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in">
-                <div class="lg:col-span-2 glass-panel p-4 rounded-2xl flex justify-center items-center bg-gray-950">
-                    <img id="cropperSourceImage" class="max-w-full rounded-lg" style="display: block; max-height: 450px;" />
-                </div>
-                <div class="glass-panel p-6 rounded-2xl space-y-4 h-fit">
-                    <h3 class="text-xs font-bold uppercase tracking-wider text-gray-400">Aspect Adjustments</h3>
-                    <div class="grid grid-cols-3 gap-2">
-                        <button @click="setAspectRatio(1)" class="bg-gray-900 border border-gray-800 text-xs py-2 rounded-lg hover:border-gray-700">1:1 Square</button>
-                        <button @click="setAspectRatio(4/3)" class="bg-gray-900 border border-gray-800 text-xs py-2 rounded-lg hover:border-gray-700">4:3 Photo</button>
-                        <button @click="setAspectRatio(NaN)" class="bg-gray-900 border border-gray-800 text-xs py-2 rounded-lg hover:border-gray-700">Freeform</button>
-                    </div>
-                    <button @click="exportCroppedImage" class="w-full bg-emerald-500 hover:bg-emerald-600 text-gray-950 font-bold py-2 rounded-lg text-xs transition">Render & Compress Output</button>
-                    
-                    <template x-if="croppedResultBase64">
-                        <div class="pt-4 border-t border-gray-800 text-center space-y-3">
-                            <img :src="croppedResultBase64" class="mx-auto rounded-lg max-h-40 shadow-xl border border-gray-800" />
-                            <a :href="croppedResultBase64" download="studio-export.jpg" class="inline-block bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 text-xs px-4 py-2 rounded-lg font-semibold transition">Save Rendered Asset</a>
-                        </div>
+            <div class="overflow-auto max-h-[60vh] rounded-xl border border-white/5">
+              <table class="w-full text-sm">
+                <thead class="sticky top-0 bg-[#0d1320]/95 backdrop-blur z-10">
+                  <tr>
+                    <th class="text-left px-3 py-2.5 font-medium text-slate-400 text-xs uppercase tracking-wider border-b border-white/10">#</th>
+                    <template x-for="header in sheetHeaders" :key="header">
+                      <th class="text-left px-3 py-2.5 font-medium text-slate-300 text-xs uppercase tracking-wider border-b border-white/10 whitespace-nowrap" x-text="header"></th>
                     </template>
-                </div>
+                  </tr>
+                </thead>
+                <tbody>
+                  <template x-for="(row, idx) in searchResults" :key="idx">
+                    <tr class="table-row">
+                      <td class="px-3 py-2 text-xs font-mono text-slate-500" x-text="idx + 1"></td>
+                      <template x-for="header in sheetHeaders" :key="header">
+                        <td class="px-3 py-2 text-slate-300 whitespace-nowrap max-w-[280px] overflow-hidden text-ellipsis" x-text="formatCellValue(row[header])"></td>
+                      </template>
+                    </tr>
+                  </template>
+                  <template x-if="searchResults.length === 0">
+                    <tr><td :colspan="sheetHeaders.length + 1" class="text-center py-12 text-slate-500">No matching rows</td></tr>
+                  </template>
+                </tbody>
+              </table>
             </div>
-        </section>
+          </div>
+        </template>
+      </div>
+    </section>
 
-        <!-- ==================== TAB 4: ROUGH.JS SKETCH NOTES & OCR ==================== -->
-        <section x-show="activeTab === 'notes'" x-cloak class="space-y-6">
-            <div class="glass-panel p-6 rounded-2xl shadow-xl grid grid-cols-1 lg:grid-cols-3 gap-8 relative">
-                
-                <!-- Input Canvas & Controls -->
-                <div class="lg:col-span-2 space-y-4">
-                    <div class="flex items-center justify-between">
-                        <h2 class="text-base font-bold text-emerald-400">Imperfect Sketchpad Workspace</h2>
-                        <!-- Client-Side Local OCR Dropzone Container -->
-                        <div class="flex items-center gap-2">
-                            <label class="text-[10px] bg-teal-500/10 text-teal-400 font-semibold px-2 py-1 rounded border border-teal-500/20 cursor-pointer hover:bg-teal-500/20 transition">
-                                📷 Optical OCR Extract
-                                <input type="file" accept="image/*" class="hidden" @change="runClientSideOCR" />
-                            </label>
-                            <span x-show="ocrLoading" class="text-xs text-yellow-400 font-mono animate-pulse">Extracting text...</span>
-                        </div>
-                    </div>
-                    
-                    <div class="relative bg-gray-900 rounded-xl p-4 min-h-[160px] border border-gray-800">
-                        <!-- Hand drawn backdrop decoration from RoughJS -->
-                        <canvas id="roughSketchCanvas" class="absolute inset-0 w-full h-full pointer-events-none"></canvas>
-                        
-                        <input type="text" x-model="newNoteTitle" placeholder="Title..." class="relative z-10 w-full bg-transparent text-sm font-bold text-white focus:outline-none mb-2 placeholder-gray-600" />
-                        <textarea x-model="newNoteContent" rows="5" placeholder="Start typing thoughts here..." class="relative z-10 w-full bg-transparent text-xs text-gray-300 focus:outline-none resize-none placeholder-gray-600"></textarea>
-                    </div>
+    <!-- ================== IMAGE STUDIO ================== -->
+    <section x-show="activeTab === 'image'" class="fade-in space-y-6">
+      <div class="flex items-start justify-between flex-wrap gap-4">
+        <div>
+          <h2 class="text-2xl font-semibold tracking-tight">Image Studio</h2>
+          <p class="text-sm text-slate-400 mt-1">Crop, aspect-lock, and export as a compressed client-side JPEG. Nothing uploaded.</p>
+        </div>
+        <div class="flex gap-2">
+          <label class="btn-secondary px-4 py-2.5 rounded-lg text-sm cursor-pointer flex items-center gap-2">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="w-4 h-4"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+            Load Image
+            <input type="file" accept="image/*" class="hidden" @change="handleImageUpload($event)" />
+          </label>
+          <button @click="exportCroppedImage()" :disabled="!cropper" class="btn-primary px-4 py-2.5 rounded-lg text-sm flex items-center gap-2 disabled:opacity-40">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="w-4 h-4"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+            Export JPEG 0.8
+          </button>
+        </div>
+      </div>
 
-                    <button @click="saveNote(); $nextTick(() => drawSketchUI())" class="bg-emerald-500 hover:bg-emerald-600 text-gray-950 font-bold py-2 px-4 rounded-xl text-xs transition shadow-lg shadow-emerald-500/10">
-                        Commit Notes to Cache
-                    </button>
-                </div>
-
-                <!-- Active Repository Shelf -->
-                <div class="lg:col-span-1 space-y-4">
-                    <h3 class="text-xs font-bold uppercase tracking-widest text-gray-500">Local DB Storage Vault</h3>
-                    <div class="space-y-2 max-h-[260px] overflow-y-auto pr-1">
-                        <template x-for="note in notesList" :key="note.id">
-                            <div class="bg-gray-900/60 border border-gray-800 p-3 rounded-xl flex items-center justify-between hover:border-emerald-500/40 transition cursor-pointer" @click="loadNote(note)">
-                                <div class="truncate pr-2">
-                                    <h4 class="text-xs font-bold text-gray-200 truncate" x-text="note.title"></h4>
-                                    <p class="text-[10px] text-gray-500 truncate" x-text="note.content"></p>
-                                </div>
-                                <button @click.stop="deleteNote(note.id); $nextTick(() => drawSketchUI())" class="text-red-400 hover:text-red-300 text-xs transition">🗑️</button>
-                            </div>
-                        </template>
-                    </div>
-                </div>
+      <div class="grid lg:grid-cols-[1fr_320px] gap-6">
+        <div class="glass rounded-2xl p-5 min-h-[500px]">
+          <template x-if="!imageLoaded">
+            <div class="drop-zone rounded-xl p-12 text-center h-full flex flex-col items-center justify-center"
+                 @click="$refs.imageFileInput.click()"
+                 @dragover.prevent="imageDropOver = true" @dragleave.prevent="imageDropOver = false"
+                 @drop.prevent="handleImageDrop($event)"
+                 :class="imageDropOver ? 'dragover' : ''">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" class="w-14 h-14 mx-auto text-emerald-400/70 mb-4">
+                <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>
+              </svg>
+              <h3 class="text-lg font-medium">Drop an image</h3>
+              <p class="text-sm text-slate-400 mt-1">PNG · JPG · WEBP · GIF</p>
+              <input type="file" x-ref="imageFileInput" accept="image/*" class="hidden" @change="handleImageUpload($event)" />
             </div>
-        </section>
+          </template>
+          <template x-if="imageLoaded">
+            <div class="space-y-3">
+              <div class="overflow-hidden rounded-xl max-h-[60vh] flex items-center justify-center bg-black/30">
+                <img x-ref="cropImage" class="max-w-full block" />
+              </div>
+              <button @click="resetImage()" class="btn-secondary px-3 py-1.5 rounded-lg text-xs">Load Different Image</button>
+            </div>
+          </template>
+        </div>
 
-    </main>
+        <div class="glass rounded-2xl p-5 space-y-5">
+          <div>
+            <h3 class="text-sm font-semibold uppercase tracking-wider text-slate-300 mb-3">Aspect Ratio</h3>
+            <div class="grid grid-cols-2 gap-2">
+              <button @click="setCropAspect(NaN)" :class="cropAspectRatio !== cropAspectRatio ? 'tab-active' : 'tab-btn'" class="px-3 py-2 rounded-lg text-sm border">Free</button>
+              <button @click="setCropAspect(1)" :class="cropAspectRatio === 1 ? 'tab-active' : 'tab-btn'" class="px-3 py-2 rounded-lg text-sm border">1 : 1</button>
+              <button @click="setCropAspect(4/3)" :class="cropAspectRatio === 4/3 ? 'tab-active' : 'tab-btn'" class="px-3 py-2 rounded-lg text-sm border">4 : 3</button>
+              <button @click="setCropAspect(16/9)" :class="cropAspectRatio === 16/9 ? 'tab-active' : 'tab-btn'" class="px-3 py-2 rounded-lg text-sm border">16 : 9</button>
+              <button @click="setCropAspect(3/4)" :class="cropAspectRatio === 3/4 ? 'tab-active' : 'tab-btn'" class="px-3 py-2 rounded-lg text-sm border">3 : 4</button>
+              <button @click="setCropAspect(2/3)" :class="cropAspectRatio === 2/3 ? 'tab-active' : 'tab-btn'" class="px-3 py-2 rounded-lg text-sm border">2 : 3</button>
+            </div>
+          </div>
 
-    <script>
-        // Set up global hook references for PDFJS build pipeline 
-        const pdfjsLib = window['pdfjs-dist/build/pdf'];
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+          <div>
+            <label class="text-xs text-slate-400 font-mono flex justify-between">
+              <span>EXPORT QUALITY</span>
+              <span x-text="exportQuality.toFixed(2)"></span>
+            </label>
+            <input type="range" min="0.3" max="0.95" step="0.05" x-model.number="exportQuality" class="w-full" />
+          </div>
 
-        function app() {
-            return {
-                activeTab: 'pdf',
-                
-                // --- EXCEL ---
-                excelHeaders: [],
-                excelRows: [],
-                filteredExcelRows: [],
-                excelSearchQuery: '',
-                fuseInstance: null,
+          <div class="pt-3 border-t border-white/5 space-y-2 text-xs text-slate-400 font-mono">
+            <div class="flex justify-between"><span>Source:</span><span class="text-slate-300 truncate ml-2 max-w-[160px]" x-text="imageFileName"></span></div>
+            <div class="flex justify-between"><span>Output format:</span><span class="text-slate-300">image/jpeg</span></div>
+            <div class="flex justify-between"><span>Engine:</span><span class="text-slate-300">Cropper.js → Canvas</span></div>
+          </div>
 
-                // --- INTERACTIVE VISUAL PDF ---
-                pdfFileLoaded: false,
-                pdfFileName: '',
-                pdfDocInstance: null,
-                pdfCurrentPage: 1,
-                pdfTotalPages: 0,
-                pdfRawBytes: null,
-                pdfSignatureBytes: null,
-                pdfOverlayText: '',
-                pdfX: 100,
-                pdfY: 100,
-                pdfScale: 1.5,
+          <div class="pt-3 border-t border-white/5">
+            <p class="text-xs text-slate-500 leading-relaxed">
+              Cropper.js renders the image into a viewport with draggable edges. On export, the cropped region is rasterized via <span class="font-mono text-slate-400">canvas.toDataURL('image/jpeg', quality)</span> for a lightweight, web-ready file.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
 
-                // --- CROPPER ---
-                imageSelected: false,
-                cropperInstance: null,
-                croppedResultBase64: '',
+  </main>
 
-                // --- NOTES & OCR ---
-                newNoteTitle: '',
-                newNoteContent: '',
-                notesList: [],
-                ocrLoading: false,
+  <!-- Toast -->
+  <div x-show="toast.visible" x-transition class="fixed bottom-6 right-6 z-50 glass-strong rounded-xl px-4 py-3 max-w-sm shadow-2xl">
+    <div class="flex items-start gap-3">
+      <div class="w-2 h-2 rounded-full mt-1.5" :class="toast.type === 'error' ? 'bg-red-400' : (toast.type === 'info' ? 'bg-blue-400' : 'bg-emerald-400')"></div>
+      <div>
+        <div class="text-sm font-medium" x-text="toast.title"></div>
+        <div class="text-xs text-slate-400 mt-0.5" x-text="toast.message"></div>
+      </div>
+    </div>
+  </div>
+</div>
 
-                initApp() {
-                    localforage.config({ name: 'AnvilInkWorkspace', storeName: 'secure_vault' });
-                    this.loadSavedNotesFromDB();
-                },
+<script>
+/* =========================================================================
+   ANVIL & INK WORKSPACE
+   - All library wiring, state, and logic live in this single file
+   - Service Worker registered via Blob URL for offline resilience
+   ========================================================================= */
 
-                // --- DYNAMIC INTERACTIVE VISUAL PDF HOOKS ---
-                async loadPdfPreview(event) {
-                    const file = event.target.files[0];
-                    if (!file) return;
-                    this.pdfFileName = file.name;
+/* ---------- Service Worker (inline blob) ---------- */
+(function registerInlineServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
 
-                    const arrayBufferReader = new FileReader();
-                    arrayBufferReader.onload = async (e) => {
-                        this.pdfRawBytes = e.target.result;
-                        
-                        // Load document instance for visual canvas generation using PDFJS
-                        const typedArray = new Uint8Array(this.pdfRawBytes);
-                        this.pdfDocInstance = await pdfjsLib.getDocument(typedArray).promise;
-                        this.pdfTotalPages = this.pdfDocInstance.numPages;
-                        this.pdfCurrentPage = 1;
-                        this.pdfFileLoaded = true;
+  const swCode = `
+    const CACHE_NAME = 'anvil-ink-workspace-v1';
+    const PRECACHE_URLS = [
+      './',
+      'https://cdn.tailwindcss.com',
+      'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap',
+      'https://cdn.jsdelivr.net/npm/localforage@1.10.0/dist/localforage.min.js',
+      'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',
+      'https://cdn.jsdelivr.net/npm/fuse.js@7.0.0/dist/fuse.min.js',
+      'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js',
+      'https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js',
+      'https://cdn.jsdelivr.net/npm/cropperjs@1.5.13/dist/cropper.min.js',
+      'https://cdn.jsdelivr.net/npm/cropperjs@1.5.13/dist/cropper.min.css',
+      'https://cdn.jsdelivr.net/npm/roughjs@4.6.6/bundled/rough.min.js',
+      'https://cdn.jsdelivr.net/npm/tesseract.js@5.0.4/dist/tesseract.min.js',
+      'https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js'
+    ];
 
-                        this.$nextTick(() => this.renderPdfPageToCanvas());
-                    };
-                    arrayBufferReader.readAsArrayBuffer(file);
-                },
+    self.addEventListener('install', (event) => {
+      self.skipWaiting();
+      event.waitUntil(
+        caches.open(CACHE_NAME).then(cache =>
+          Promise.allSettled(PRECACHE_URLS.map(u => cache.add(u)))
+        ).catch(() => {})
+      );
+    });
 
-                async renderPdfPageToCanvas() {
-                    if (!this.pdfDocInstance) return;
+    self.addEventListener('activate', (event) => {
+      event.waitUntil(
+        caches.keys().then(keys =>
+          Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
+        ).then(() => self.clients.claim())
+      );
+    });
 
-                    const page = await this.pdfDocInstance.getPage(this.pdfCurrentPage);
-                    const canvas = document.getElementById('pdfRenderCanvas');
-                    const context = canvas.getContext('2d');
+    self.addEventListener('fetch', (event) => {
+      const req = event.request;
+      if (req.method !== 'GET') return;
+      // Stale-while-revalidate for everything
+      event.respondWith(
+        caches.match(req).then(cached => {
+          const network = fetch(req).then(res => {
+            if (res && (res.status === 200 || res.type === 'opaque')) {
+              const clone = res.clone();
+              caches.open(CACHE_NAME).then(c => c.put(req, clone)).catch(() => {});
+            }
+            return res;
+          }).catch(() => cached);
+          return cached || network;
+        })
+      );
+    });
+  `;
 
-                    const viewport = page.getViewport({ scale: this.pdfScale });
-                    canvas.height = viewport.height;
-                    canvas.width = viewport.width;
+  try {
+    const blob = new Blob([swCode], { type: 'application/javascript' });
+    const url = URL.createObjectURL(blob);
+    navigator.serviceWorker.register(url, { scope: './' })
+      .then(() => { window.__swStatus = 'Cached'; })
+      .catch((err) => { console.warn('SW registration failed:', err); window.__swStatus = 'Limited'; });
+  } catch (e) {
+    console.warn('SW init error:', e);
+    window.__swStatus = 'Unavailable';
+  }
+})();
 
-                    const renderContext = { canvasContext: context, viewport: viewport };
-                    await page.render(renderContext).promise;
-                },
+/* ---------- PDF.js worker ---------- */
+if (window.pdfjsLib) {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+}
 
-                changePdfPage(direction) {
-                    const next = this.pdfCurrentPage + direction;
-                    if (next >= 1 && next <= this.pdfTotalPages) {
-                        this.pdfCurrentPage = next;
-                        this.renderPdfPageToCanvas();
-                    }
-                },
+/* ---------- LocalForage config ---------- */
+const noteStore = (window.localforage && localforage.createInstance) ? localforage.createInstance({
+  name: 'AnvilInk',
+  storeName: 'notes',
+  description: 'Offline notes for Anvil & Ink Workspace'
+}) : null;
 
-                captureCoordinates(event) {
-                    const canvas = document.getElementById('pdfRenderCanvas');
-                    const rect = canvas.getBoundingClientRect();
-                    
-                    // Extract local canvas mapping locations
-                    const clickX = event.clientX - rect.left;
-                    const clickY = event.clientY - rect.top;
+/* ---------- Alpine component ---------- */
+function anvilWorkspace() {
+  return {
+    /* ---------- TABS ---------- */
+    tabs: [
+      { id: 'pdf', label: 'PDF Signer', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="w-4 h-4"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M9 13h6M9 17h4"/></svg>' },
+      { id: 'notes', label: 'Quick Notes', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="w-4 h-4"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>' },
+      { id: 'sheet', label: 'Spreadsheet', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="w-4 h-4"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg>' },
+      { id: 'image', label: 'Image Studio', icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="w-4 h-4"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>' }
+    ],
+    activeTab: 'pdf',
 
-                    // Compute scaling factor variables to maps raw resolution back down into native standard coordinates
-                    const normalizedX = (clickX / rect.width) * canvas.width;
-                    const normalizedY = (clickY / rect.height) * canvas.height;
+    /* ---------- GLOBAL ---------- */
+    online: navigator.onLine,
+    swStatus: window.__swStatus || 'Init',
+    toast: { visible: false, title: '', message: '', type: 'info' },
 
-                    // Convert into native internal standard points dimensions required by PDF-Lib
-                    this.pdfX = Math.round(normalizedX / this.pdfScale);
-                    
-                    // PDF-Lib coordinate spaces flip the Y axis (0 point begins at bottom left edge corner)
-                    this.pdfY = Math.round((canvas.height - normalizedY) / this.pdfScale);
+    /* ---------- PDF ---------- */
+    pdfDoc: null,
+    pdfOriginalBytes: null,
+    pdfPageNum: 1,
+    pdfTotalPages: 0,
+    pdfScale: 1.4,
+    pdfViewport: null,
+    pdfClickPoints: [], // { pageNum, x, y, cssX, cssY }
+    pdfRenderTask: null,
+    dropZoneOver: false,
+    pdfExporting: false,
+    signatureMode: 'image',
+    signatureImage: null,       // dataURL
+    signatureImageBytes: null,  // Uint8Array (raw)
+    signatureImageKind: 'png',  // 'png' or 'jpg'
+    signatureWidth: 160,
+    signatureText: '',
+    signatureFontSize: 18,
+    signatureColor: '#0a0a0a',
 
-                    // Add a tiny visible temporary flash circle confirming coordinates map lock position
-                    const ctx = canvas.getContext('2d');
-                    this.renderPdfPageToCanvas().then(() => {
-                        ctx.beginPath();
-                        ctx.arc(normalizedX, normalizedY, 8, 0, 2 * Math.PI);
-                        ctx.fillStyle = '#10b981';
-                        ctx.fill();
-                    });
-                },
+    /* ---------- NOTES ---------- */
+    notes: [],
+    activeNoteId: null,
+    noteTitle: '',
+    noteContent: '',
+    autosaveTimer: null,
+    autosaveStatus: 'saved',
+    ocrProcessing: false,
+    ocrProgress: 0,
+    roughCanvas: null,
 
-                handlePdfSignatureUpload(event) {
-                    const file = event.target.files[0];
-                    if (!file) return;
-                    const reader = new FileReader();
-                    reader.onload = (e) => this.pdfSignatureBytes = e.target.result;
-                    reader.readAsArrayBuffer(file);
-                },
+    /* ---------- SPREADSHEET ---------- */
+    sheetData: [],
+    sheetHeaders: [],
+    sheetFileName: '',
+    fuseIndex: null,
+    searchQuery: '',
+    searchResults: [],
+    sheetDropOver: false,
 
-                async generateSignedPdf() {
-                    if (!this.pdfRawBytes) return;
-                    try {
-                        const pdfDoc = await PDFLib.PDFDocument.load(this.pdfRawBytes);
-                        const pages = pdfDoc.getPages();
-                        const targetPage = pages[this.pdfCurrentPage - 1];
+    /* ---------- IMAGE STUDIO ---------- */
+    cropper: null,
+    cropAspectRatio: NaN,
+    imageLoaded: false,
+    imageFileName: '',
+    imageDropOver: false,
+    exportQuality: 0.8,
 
-                        if (this.pdfOverlayText.trim()) {
-                            targetPage.drawText(this.pdfOverlayText, {
-                                x: this.pdfX,
-                                y: this.pdfY,
-                                size: 14,
-                                color: PDFLib.rgb(0.06, 0.45, 0.37)
-                            });
-                        }
+    /* ============================================================
+       INIT
+       ============================================================ */
+    init() {
+      window.addEventListener('online', () => { this.online = true; });
+      window.addEventListener('offline', () => { this.online = false; });
 
-                        if (this.pdfSignatureBytes) {
-                            let signatureImage;
-                            if (this.pdfFileName.toLowerCase().endsWith('.png')) {
-                                signatureImage = await pdfDoc.embedPng(this.pdfSignatureBytes);
-                            } else {
-                                signatureImage = await pdfDoc.embedJpg(this.pdfSignatureBytes);
-                            }
-                            targetPage.drawImage(signatureImage, {
-                                x: this.pdfX,
-                                y: this.pdfY,
-                                width: 100,
-                                height: 50
-                            });
-                        }
+      this.swStatus = window.__swStatus || 'Active';
+      // poll SW status briefly
+      setTimeout(() => { this.swStatus = window.__swStatus || 'Active'; }, 1500);
 
-                        const pdfBytes = await pdfDoc.save();
-                        const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-                        const link = document.createElement('a');
-                        link.href = URL.createObjectURL(blob);
-                        link.download = `signed-${this.pdfFileName}`;
-                        link.click();
-                    } catch (err) {
-                        alert("Rendering transaction failed. Verify media type specifications.");
-                        console.error(err);
-                    }
-                },
-
-                // --- ROUGH.JS ORGANIC SKETCH ENGINE HOOKS ---
-                drawSketchUI() {
-                    const canvas = document.getElementById('roughSketchCanvas');
-                    if (!canvas) return;
-                    
-                    const rc = rough.canvas(canvas);
-                    const ctx = canvas.getContext('2d');
-                    
-                    // Resize to match container bounds dynamically
-                    canvas.width = canvas.parentElement.offsetWidth;
-                    canvas.height = canvas.parentElement.offsetHeight;
-                    ctx.clearRect(0,0, canvas.width, canvas.height);
-
-                    // Draw fine hand-sketched boundaries for an imperfect feel
-                    rc.rectangle(4, 4, canvas.width - 8, canvas.height - 8, {
-                        roughness: 1.4,
-                        stroke: '#1f2937',
-                        strokeWidth: 2
-                    });
-
-                    // Draw organic underline details underneath input title header space
-                    rc.line(10, 42, canvas.width - 10, 44, {
-                        roughness: 1.8,
-                        stroke: '#10b981',
-                        strokeWidth: 1.5
-                    });
-                },
-
-                // --- PURE CLIENT-SIDE TESSERACT.JS OCR ---
-                async runClientSideOCR(event) {
-                    const file = event.target.files[0];
-                    if (!file) return;
-                    
-                    this.ocrLoading = true;
-                    try {
-                        const result = await Tesseract.recognize(file, 'eng');
-                        this.newNoteContent += (this.newNoteContent ? "\n" : "") + result.data.text;
-                    } catch (error) {
-                        console.error("OCR operation failed.", error);
-                        alert("Failed to parse characters from standard digital scan asset target.");
-                    } finally {
-                        this.ocrLoading = false;
-                        this.$nextTick(() => this.drawSketchUI());
-                    }
-                },
-
-                // --- DATA EXCEL PARSER ---
-                handleExcelUpload(event) {
-                    const file = event.target.files[0];
-                    if (!file) return;
-                    const reader = new FileReader();
-                    reader.onload = (e) => {
-                        const data = new Uint8Array(e.target.result);
-                        const workbook = XLSX.read(data, { type: 'array' });
-                        const json = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { defval: "" });
-                        if (json.length > 0) {
-                            this.excelHeaders = Object.keys(json[0]);
-                            this.excelRows = json;
-                            this.filteredExcelRows = [...json];
-                            this.fuseInstance = new Fuse(this.excelRows, { keys: this.excelHeaders, threshold: 0.3 });
-                        }
-                    };
-                    reader.readAsArrayBuffer(file);
-                },
-
-                fuzzySearchExcel() {
-                    if (!this.excelSearchQuery.trim()) {
-                        this.filteredExcelRows = [...this.excelRows];
-                        return;
-                    }
-                    if (this.fuseInstance) {
-                        this.filteredExcelRows = this.fuseInstance.search(this.excelSearchQuery).map(i => i.item);
-                    }
-                },
-
-                // --- CROPPER TOOLS ---
-                loadImageForCropping(event) {
-                    const file = event.target.files[0];
-                    if (!file) return;
-                    this.imageSelected = true;
-                    const reader = new FileReader();
-                    reader.onload = (e) => {
-                        const image = document.getElementById('cropperSourceImage');
-                        image.src = e.target.result;
-                        if (this.cropperInstance) this.cropperInstance.destroy();
-                        this.$nextTick(() => {
-                            this.cropperInstance = new Cropper(image, { viewMode: 1, dragMode: 'move', autoCropArea: 0.8 });
-                        });
-                    };
-                    reader.readAsDataURL(file);
-                },
-
-                setAspectRatio(val) {
-                    if(this.cropperInstance) this.cropperInstance.setAspectRatio(val);
-                },
-
-                exportCroppedImage() {
-                    if (!this.cropperInstance) return;
-                    const canvas = this.cropperInstance.getCroppedCanvas({ width: 800, height: 800 });
-                    this.croppedResultBase64 = canvas.toDataURL('image/jpeg', 0.8);
-                },
-
-                // --- LOCAL DATABASE STORAGE VAULT ---
-                async saveNote() {
-                    if (!this.newNoteTitle.trim()) return;
-                    const entry = { id: Date.now(), title: this.newNoteTitle, content: this.newNoteContent };
-                    this.notesList.unshift(entry);
-                    await localforage.setItem('vault_notes', JSON.parse(JSON.stringify(this.notesList)));
-                    this.newNoteTitle = '';
-                    this.newNoteContent = '';
-                },
-
-                async loadSavedNotesFromDB() {
-                    const data = await localforage.getItem('vault_notes');
-                    if (data) this.notesList = data;
-                },
-
-                loadNote(n) {
-                    this.newNoteTitle = n.title;
-                    this.newNoteContent = n.content;
-                    this.$nextTick(() => this.drawSketchUI());
-                },
-
-                async deleteNote(id) {
-                    this.notesList = this.notesList.filter(n => n.id !== id);
-                    await localforage.setItem('vault_notes', JSON.parse(JSON.stringify(this.notesList)));
-                }
-            };
+      // Load notes
+      this.loadNotes().then(() => {
+        if (this.notes.length === 0) {
+          this.createNote('Welcome to Anvil & Ink', '# Welcome\n\nThis notepad saves directly to **IndexedDB** via LocalForage.\n\nClick "Scan Image (OCR)" to extract printed text from any image — fully on-device via Tesseract.js.\n\nTry the other tabs:\n- **PDF Signer** — click to place signature pins\n- **Spreadsheet** — drop a CSV/XLSX, fuzzy search\n- **Image Studio** — crop + compress to JPEG');
+        } else {
+          this.selectNote(this.notes[0].id);
         }
-    </script>
+      });
+
+      // Rough.js canvas
+      this.$watch('noteContent', () => this.drawRoughNotepad());
+      this.$watch('noteTitle', () => this.drawRoughNotepad());
+      this.$watch('activeTab', (val) => {
+        if (val === 'notes') {
+          this.$nextTick(() => this.drawRoughNotepad());
+        }
+      });
+
+      // Keyboard shortcut: Cmd/Ctrl+S
+      window.addEventListener('keydown', (e) => {
+        if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+          e.preventDefault();
+          if (this.activeTab === 'notes') this.saveNote();
+        }
+      });
+
+      // Window resize -> redraw rough canvas
+      window.addEventListener('resize', () => {
+        if (this.activeTab === 'notes') this.drawRoughNotepad();
+      });
+    },
+
+    setTab(id) {
+      this.activeTab = id;
+    },
+
+    showToast(title, message = '', type = 'info') {
+      this.toast = { visible: true, title, message, type };
+      clearTimeout(this._toastTimer);
+      this._toastTimer = setTimeout(() => { this.toast.visible = false; }, 3500);
+    },
+
+    /* ============================================================
+       PDF SIGNER
+       ============================================================ */
+    async handlePdfUpload(event) {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+      await this.loadPdf(file);
+      event.target.value = '';
+    },
+
+    async handlePdfDrop(event) {
+      this.dropZoneOver = false;
+      const file = event.dataTransfer.files && event.dataTransfer.files[0];
+      if (!file) return;
+      if (file.type !== 'application/pdf') {
+        this.showToast('Wrong file type', 'Please drop a PDF file.', 'error');
+        return;
+      }
+      await this.loadPdf(file);
+    },
+
+    async loadPdf(file) {
+      try {
+        this.showToast('Loading PDF…', file.name, 'info');
+        const arrayBuffer = await file.arrayBuffer();
+        // Keep original bytes for PDF-Lib processing
+        this.pdfOriginalBytes = new Uint8Array(arrayBuffer.slice(0));
+
+        // Load via PDF.js for rendering
+        const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+        this.pdfDoc = await loadingTask.promise;
+        this.pdfTotalPages = this.pdfDoc.numPages;
+        this.pdfPageNum = 1;
+        this.pdfClickPoints = [];
+        await this.renderPdfPage();
+        this.showToast('PDF loaded', `${this.pdfTotalPages} page(s) ready`, 'info');
+      } catch (err) {
+        console.error('PDF load error:', err);
+        this.showToast('Failed to load PDF', err.message || 'Unknown error', 'error');
+      }
+    },
+
+    async renderPdfPage() {
+      if (!this.pdfDoc) return;
+      try {
+        const page = await this.pdfDoc.getPage(this.pdfPageNum);
+        const viewport = page.getViewport({ scale: this.pdfScale });
+        this.pdfViewport = viewport;
+        const canvas = this.$refs.pdfCanvas;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+
+        // HiDPI handling
+        const outputScale = window.devicePixelRatio || 1;
+        canvas.width = Math.floor(viewport.width * outputScale);
+        canvas.height = Math.floor(viewport.height * outputScale);
+        canvas.style.width = Math.floor(viewport.width) + 'px';
+        canvas.style.height = Math.floor(viewport.height) + 'px';
+
+        const transform = outputScale !== 1 ? [outputScale, 0, 0, outputScale, 0, 0] : null;
+
+        if (this.pdfRenderTask) {
+          try { this.pdfRenderTask.cancel(); } catch (e) {}
+        }
+        this.pdfRenderTask = page.render({ canvasContext: ctx, viewport, transform });
+        await this.pdfRenderTask.promise;
+        this.pdfRenderTask = null;
+      } catch (err) {
+        if (err && err.name === 'RenderingCancelledException') return;
+        console.error('Render error:', err);
+      }
+    },
+
+    async prevPage() {
+      if (this.pdfPageNum <= 1) return;
+      this.pdfPageNum--;
+      await this.renderPdfPage();
+    },
+
+    async nextPage() {
+      if (this.pdfPageNum >= this.pdfTotalPages) return;
+      this.pdfPageNum++;
+      await this.renderPdfPage();
+    },
+
+    /**
+     * Capture click on PDF canvas and convert to native PDF coordinates.
+     * PDF.js viewport.convertToPDFPoint(x, y) handles the Y-axis flip
+     * (canvas Y goes down from top; PDF Y goes up from bottom).
+     * We also account for the devicePixelRatio scaling we applied.
+     */
+    handlePdfCanvasClick(event) {
+      if (!this.pdfViewport) return;
+      const canvas = this.$refs.pdfCanvas;
+      const wrap = this.$refs.pdfCanvasWrap;
+      if (!canvas || !wrap) return;
+
+      const rect = canvas.getBoundingClientRect();
+
+      // CSS coordinates relative to the canvas element
+      const cssX = event.clientX - rect.left;
+      const cssY = event.clientY - rect.top;
+
+      // The viewport was constructed at scale `pdfScale` (CSS pixels).
+      // canvas internal width = viewport.width * dpr, but viewport coords use CSS px.
+      // viewport.convertToPDFPoint expects viewport-space (CSS-scale) coordinates.
+      const viewportX = cssX;
+      const viewportY = cssY;
+
+      // Convert to PDF native points (origin bottom-left)
+      const pdfPoint = this.pdfViewport.convertToPDFPoint(viewportX, viewportY);
+      const pdfX = pdfPoint[0];
+      const pdfY = pdfPoint[1];
+
+      this.pdfClickPoints.push({
+        pageNum: this.pdfPageNum,
+        x: pdfX,
+        y: pdfY,
+        cssX: cssX,
+        cssY: cssY
+      });
+
+      this.showToast('Pin placed', `Page ${this.pdfPageNum} · (${pdfX.toFixed(1)}, ${pdfY.toFixed(1)})`, 'info');
+    },
+
+    removeMarker(marker) {
+      this.pdfClickPoints = this.pdfClickPoints.filter(p => p !== marker);
+    },
+
+    clearPdfMarkers() {
+      this.pdfClickPoints = this.pdfClickPoints.filter(p => p.pageNum !== this.pdfPageNum);
+    },
+
+    async handleSignatureImageUpload(event) {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        this.signatureImageBytes = new Uint8Array(arrayBuffer);
+        this.signatureImageKind = (file.type === 'image/jpeg' || file.type === 'image/jpg') ? 'jpg' : 'png';
+        const reader = new FileReader();
+        reader.onload = (e) => { this.signatureImage = e.target.result; };
+        reader.readAsDataURL(file);
+        this.showToast('Signature loaded', file.name, 'info');
+      } catch (err) {
+        this.showToast('Failed to load image', err.message, 'error');
+      }
+      event.target.value = '';
+    },
+
+    hexToRgb(hex) {
+      const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+      return m ? { r: parseInt(m[1], 16) / 255, g: parseInt(m[2], 16) / 255, b: parseInt(m[3], 16) / 255 } : { r: 0, g: 0, b: 0 };
+    },
+
+    async exportSignedPdf() {
+      if (!this.pdfOriginalBytes || this.pdfClickPoints.length === 0) {
+        this.showToast('Nothing to export', 'Load a PDF and place at least one pin.', 'error');
+        return;
+      }
+      if (this.signatureMode === 'image' && !this.signatureImageBytes) {
+        this.showToast('Missing signature', 'Upload a signature image first.', 'error');
+        return;
+      }
+      if (this.signatureMode === 'text' && !this.signatureText.trim()) {
+        this.showToast('Missing text', 'Type your signature text first.', 'error');
+        return;
+      }
+
+      this.pdfExporting = true;
+      try {
+        const { PDFDocument, rgb, StandardFonts } = PDFLib;
+        const pdfLibDoc = await PDFDocument.load(this.pdfOriginalBytes, { ignoreEncryption: true });
+        const pages = pdfLibDoc.getPages();
+
+        // Embed signature image once, reuse for all pins
+        let embeddedImg = null;
+        let imgAspect = 1;
+        if (this.signatureMode === 'image') {
+          if (this.signatureImageKind === 'jpg') {
+            embeddedImg = await pdfLibDoc.embedJpg(this.signatureImageBytes);
+          } else {
+            embeddedImg = await pdfLibDoc.embedPng(this.signatureImageBytes);
+          }
+          imgAspect = embeddedImg.width / embeddedImg.height;
+        }
+
+        const font = await pdfLibDoc.embedFont(StandardFonts.HelveticaBold);
+        const colorRgb = this.hexToRgb(this.signatureColor);
+
+        for (const pin of this.pdfClickPoints) {
+          const page = pages[pin.pageNum - 1];
+          if (!page) continue;
+
+          if (this.signatureMode === 'image' && embeddedImg) {
+            const w = this.signatureWidth;
+            const h = w / imgAspect;
+            // Center image on pin
+            page.drawImage(embeddedImg, {
+              x: pin.x - w / 2,
+              y: pin.y - h / 2,
+              width: w,
+              height: h,
+              opacity: 0.95
+            });
+          } else if (this.signatureMode === 'text') {
+            const text = this.signatureText;
+            const textWidth = font.widthOfTextAtSize(text, this.signatureFontSize);
+            // Center horizontally on pin, baseline at pin
+            page.drawText(text, {
+              x: pin.x - textWidth / 2,
+              y: pin.y - this.signatureFontSize / 2,
+              size: this.signatureFontSize,
+              font,
+              color: rgb(colorRgb.r, colorRgb.g, colorRgb.b)
+            });
+          }
+        }
+
+        const pdfBytes = await pdfLibDoc.save();
+        // Trigger download
+        const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `signed-${Date.now()}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+        this.showToast('PDF exported', `${this.pdfClickPoints.length} signature(s) baked in`, 'info');
+      } catch (err) {
+        console.error('Export error:', err);
+        this.showToast('Export failed', err.message || 'Unknown error', 'error');
+      } finally {
+        this.pdfExporting = false;
+      }
+    },
+
+    /* ============================================================
+       NOTES
+       ============================================================ */
+    async loadNotes() {
+      if (!noteStore) return;
+      try {
+        const notes = [];
+        await noteStore.iterate((value, key) => {
+          notes.push(value);
+        });
+        notes.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+        this.notes = notes;
+      } catch (err) {
+        console.error('Load notes error:', err);
+      }
+    },
+
+    createNote(title = 'Untitled', content = '') {
+      const note = {
+        id: 'note_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
+        title,
+        content,
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      };
+      this.notes.unshift(note);
+      this.selectNote(note.id);
+      this.saveNote();
+      return note;
+    },
+
+    newNote() {
+      this.createNote('Untitled', '');
+    },
+
+    async selectNote(id) {
+      const note = this.notes.find(n => n.id === id);
+      if (!note) return;
+      this.activeNoteId = id;
+      this.noteTitle = note.title;
+      this.noteContent = note.content;
+      this.$nextTick(() => this.drawRoughNotepad());
+    },
+
+    scheduleAutosave() {
+      this.autosaveStatus = 'saving';
+      clearTimeout(this.autosaveTimer);
+      this.autosaveTimer = setTimeout(() => this.saveNote(), 600);
+    },
+
+    async saveNote() {
+      if (!this.activeNoteId) return;
+      const note = this.notes.find(n => n.id === this.activeNoteId);
+      if (!note) return;
+      note.title = this.noteTitle;
+      note.content = this.noteContent;
+      note.updatedAt = Date.now();
+      try {
+        await noteStore.setItem(note.id, note);
+        this.autosaveStatus = 'saved';
+        // Re-sort list
+        this.notes.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+      } catch (err) {
+        console.error('Save error:', err);
+        this.showToast('Save failed', err.message, 'error');
+      }
+    },
+
+    async deleteNote(id) {
+      try {
+        await noteStore.removeItem(id);
+        this.notes = this.notes.filter(n => n.id !== id);
+        if (this.activeNoteId === id) {
+          if (this.notes.length > 0) {
+            this.selectNote(this.notes[0].id);
+          } else {
+            this.activeNoteId = null;
+            this.noteTitle = '';
+            this.noteContent = '';
+          }
+        }
+        this.showToast('Note deleted');
+      } catch (err) {
+        this.showToast('Delete failed', err.message, 'error');
+      }
+    },
+
+    formatDate(ts) {
+      if (!ts) return '';
+      const d = new Date(ts);
+      const now = new Date();
+      const diff = now - d;
+      if (diff < 60000) return 'just now';
+      if (diff < 3600000) return Math.floor(diff/60000) + 'm ago';
+      if (diff < 86400000) return Math.floor(diff/3600000) + 'h ago';
+      return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    },
+
+    drawRoughNotepad() {
+      const canvas = this.$refs.roughCanvas;
+      const textarea = this.$refs.noteContent;
+      if (!canvas || !textarea) return;
+      if (!window.rough) return;
+
+      // Size canvas to its parent
+      const parent = canvas.parentElement;
+      const rect = parent.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.max(rect.width, 100) * dpr;
+      canvas.height = Math.max(rect.height, 100) * dpr;
+      canvas.style.width = rect.width + 'px';
+      canvas.style.height = rect.height + 'px';
+      const ctx = canvas.getContext('2d');
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, rect.width, rect.height);
+
+      const rc = rough.canvas(canvas);
+
+      // Outer hand-drawn border
+      rc.rectangle(6, 6, rect.width - 12, rect.height - 12, {
+        stroke: 'rgba(16, 185, 129, 0.45)',
+        strokeWidth: 1.5,
+        roughness: 1.8,
+        bowing: 2,
+        fill: 'rgba(16, 185, 129, 0.02)',
+        fillStyle: 'hachure',
+        fillWeight: 0.6,
+        hachureGap: 10,
+        hachureAngle: 45
+      });
+
+      // Header underline beneath the title (approx based on textarea offset)
+      // We draw a hand-drawn line where the textarea content begins
+      const lineY = 14;
+      rc.line(20, lineY, rect.width - 20, lineY + 1, {
+        stroke: 'rgba(20, 184, 166, 0.55)',
+        strokeWidth: 1.4,
+        roughness: 2,
+        bowing: 3
+      });
+
+      // Corner doodad — small triangle in bottom right
+      const cx = rect.width - 38;
+      const cy = rect.height - 28;
+      rc.polygon([[cx, cy], [cx + 24, cy], [cx + 24, cy - 18]], {
+        stroke: 'rgba(16, 185, 129, 0.35)',
+        strokeWidth: 1,
+        roughness: 1.6,
+        fill: 'rgba(16, 185, 129, 0.04)',
+        fillStyle: 'hachure'
+      });
+    },
+
+    async handleOcrUpload(event) {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+      await this.runOcr(file);
+      event.target.value = '';
+    },
+
+    async runOcr(file) {
+      if (!window.Tesseract) {
+        this.showToast('OCR unavailable', 'Tesseract.js failed to load.', 'error');
+        return;
+      }
+      this.ocrProcessing = true;
+      this.ocrProgress = 0;
+      try {
+        const worker = await Tesseract.createWorker('eng', 1, {
+          logger: (m) => {
+            if (m.status === 'recognizing text') {
+              this.ocrProgress = Math.round((m.progress || 0) * 100);
+            }
+          }
+        });
+        const { data } = await worker.recognize(file);
+        await worker.terminate();
+
+        if (data && data.text && data.text.trim()) {
+          const extracted = data.text.trim();
+          const prefix = this.noteContent && this.noteContent.length > 0 ? '\n\n' : '';
+          this.noteContent = this.noteContent + prefix + '--- OCR Scan @ ' + new Date().toLocaleTimeString() + ' ---\n' + extracted;
+          this.scheduleAutosave();
+          this.$nextTick(() => this.drawRoughNotepad());
+          this.showToast('OCR complete', `${extracted.length} characters extracted`, 'info');
+        } else {
+          this.showToast('No text found', 'Image may not contain readable text.', 'error');
+        }
+      } catch (err) {
+        console.error('OCR error:', err);
+        this.showToast('OCR failed', err.message || 'Unknown error', 'error');
+      } finally {
+        this.ocrProcessing = false;
+        this.ocrProgress = 0;
+      }
+    },
+
+    /* ============================================================
+       SPREADSHEET
+       ============================================================ */
+    async handleSheetUpload(event) {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+      await this.loadSpreadsheet(file);
+      event.target.value = '';
+    },
+
+    async handleSheetDrop(event) {
+      this.sheetDropOver = false;
+      const file = event.dataTransfer.files && event.dataTransfer.files[0];
+      if (!file) return;
+      await this.loadSpreadsheet(file);
+    },
+
+    async loadSpreadsheet(file) {
+      try {
+        this.showToast('Parsing spreadsheet…', file.name, 'info');
+        const arrayBuffer = await file.arrayBuffer();
+        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        const json = XLSX.utils.sheet_to_json(worksheet, { defval: '', raw: false });
+        if (json.length === 0) {
+          this.showToast('Empty sheet', 'No rows found in spreadsheet.', 'error');
+          return;
+        }
+        this.sheetData = json;
+        this.sheetHeaders = Object.keys(json[0]);
+        this.sheetFileName = file.name;
+
+        // Build Fuse index over all string values
+        this.fuseIndex = new Fuse(json, {
+          keys: this.sheetHeaders,
+          includeScore: false,
+          threshold: 0.35,
+          ignoreLocation: true,
+          minMatchCharLength: 1,
+          useExtendedSearch: false
+        });
+        this.searchQuery = '';
+        this.searchResults = json.slice(0, 200);
+        this.showToast('Spreadsheet loaded', `${json.length} rows · ${this.sheetHeaders.length} columns`, 'info');
+      } catch (err) {
+        console.error('Sheet load error:', err);
+        this.showToast('Failed to parse spreadsheet', err.message, 'error');
+      }
+    },
+
+    performSearch() {
+      if (!this.fuseIndex) return;
+      const q = this.searchQuery.trim();
+      if (!q) {
+        this.searchResults = this.sheetData.slice(0, 200);
+        return;
+      }
+      const results = this.fuseIndex.search(q);
+      this.searchResults = results.slice(0, 200).map(r => r.item);
+    },
+
+    formatCellValue(val) {
+      if (val === null || val === undefined) return '';
+      if (typeof val === 'object') return JSON.stringify(val);
+      return String(val);
+    },
+
+    clearSheet() {
+      this.sheetData = [];
+      this.sheetHeaders = [];
+      this.sheetFileName = '';
+      this.fuseIndex = null;
+      this.searchQuery = '';
+      this.searchResults = [];
+    },
+
+    /* ============================================================
+       IMAGE STUDIO
+       ============================================================ */
+    async handleImageUpload(event) {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+      await this.loadImage(file);
+      event.target.value = '';
+    },
+
+    async handleImageDrop(event) {
+      this.imageDropOver = false;
+      const file = event.dataTransfer.files && event.dataTransfer.files[0];
+      if (!file) return;
+      await this.loadImage(file);
+    },
+
+    async loadImage(file) {
+      try {
+        this.imageFileName = file.name;
+        const url = URL.createObjectURL(file);
+        const img = this.$refs.cropImage;
+        if (!img) {
+          this.imageLoaded = true;
+          await this.$nextTick();
+        }
+        const imgEl = this.$refs.cropImage;
+        imgEl.src = url;
+        imgEl.onload = () => {
+          if (this.cropper) {
+            this.cropper.destroy();
+            this.cropper = null;
+          }
+          this.cropper = new Cropper(imgEl, {
+            aspectRatio: this.cropAspectRatio,
+            viewMode: 1,
+            background: false,
+            autoCropArea: 0.85,
+            responsive: true,
+            modal: true,
+            guides: true,
+            highlight: true
+          });
+        };
+        this.imageLoaded = true;
+        this.showToast('Image loaded', file.name, 'info');
+      } catch (err) {
+        this.showToast('Failed to load image', err.message, 'error');
+      }
+    },
+
+    setCropAspect(ratio) {
+      this.cropAspectRatio = ratio;
+      if (this.cropper) {
+        this.cropper.setAspectRatio(ratio);
+      }
+    },
+
+    exportCroppedImage() {
+      if (!this.cropper) return;
+      try {
+        const canvas = this.cropper.getCroppedCanvas({
+          maxWidth: 4096,
+          maxHeight: 4096,
+          imageSmoothingEnabled: true,
+          imageSmoothingQuality: 'high'
+        });
+        if (!canvas) {
+          this.showToast('Export failed', 'Could not generate canvas.', 'error');
+          return;
+        }
+        const dataUrl = canvas.toDataURL('image/jpeg', this.exportQuality);
+        const a = document.createElement('a');
+        a.href = dataUrl;
+        a.download = `cropped-${Date.now()}.jpg`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+
+        // Calculate size estimate
+        const sizeKB = Math.round(dataUrl.length * 0.75 / 1024);
+        this.showToast('Image exported', `JPEG · ~${sizeKB}KB @ Q${this.exportQuality.toFixed(2)}`, 'info');
+      } catch (err) {
+        this.showToast('Export failed', err.message, 'error');
+      }
+    },
+
+    resetImage() {
+      if (this.cropper) {
+        this.cropper.destroy();
+        this.cropper = null;
+      }
+      this.imageLoaded = false;
+      this.imageFileName = '';
+    }
+  };
+}
+
+// Expose globally for Alpine
+window.anvilWorkspace = anvilWorkspace;
+</script>
+
+<!-- Alpine.js loaded last so window.anvilWorkspace is defined -->
+<script src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js" defer></script>
 </body>
 </html>
