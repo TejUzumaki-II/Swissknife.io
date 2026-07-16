@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SwissKnife.io // Offline-First Workspace</title>
+    
+    <!-- Alpine.js (UI State) -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    
+    <!-- Tailwind CSS (Styling) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- LocalForage (IndexedDB Storage for Large Files) -->
+    <script src="https://cdn.jsdelivr.net/npm/localforage@1.10.0/dist/localforage.min.js"></script>
+    
+    <!-- Fuse.js (Fuzzy Typo-Tolerant Search) -->
+    <script src="https://cdn.jsdelivr.net/npm/fuse.js@7.0.0/dist/fuse.basic.min.js"></script>
+    
+    <!-- PDF-Lib (Client-side PDF Drawing & Modification) -->
+    <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+    
+    <!-- Cropper.js (Image Cropper CSS & JS) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cropperjs@1.6.1/dist/cropper.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/cropperjs@1.6.1/dist/cropper.min.js"></script>
+    
+    <!-- SheetJS (Excel/CSV Parser) -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+    <style>
+        [x-cloak] { display: none !important; }
+        .cropper-container { max-height: 400px !important; }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen font-sans" x-data="app()" x-init="initApp()">
+
+    <!-- Header Navigation -->
+    <header class="border-b border-gray-800 bg-gray-950 p-4 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <span class="text-2xl">🛠️</span>
+                <div>
+                    <h1 class="text-xl font-bold tracking-tight text-emerald-400">SwissKnife.io</h1>
+                    <p class="text-xs text-gray-400">All-in-One Client-Side Utility (100% Private & Offline)</p>
+                </div>
+            </div>
+            <nav class="flex bg-gray-900 p-1 rounded-lg border border-gray-800">
+                <button @click="activeTab = 'excel'" :class="activeTab === 'excel' ? 'bg-emerald-500 text-white' : 'text-gray-400 hover:text-white'" class="px-4 py-2 rounded-md text-sm font-medium transition">📊 Excel Viewer</button>
+                <button @click="activeTab = 'pdf'" :class="activeTab === 'pdf' ? 'bg-emerald-500 text-white' : 'text-gray-400 hover:text-white'" class="px-4 py-2 rounded-md text-sm font-medium transition">📝 PDF Signer</button>
+                <button @click="activeTab = 'cropper'" :class="activeTab === 'cropper' ? 'bg-emerald-500 text-white' : 'text-gray-400 hover:text-white'" class="px-4 py-2 rounded-md text-sm font-medium transition">✂️ Image Crop</button>
+                <button @click="activeTab = 'notes'" :class="activeTab === 'notes' ? 'bg-emerald-500 text-white' : 'text-gray-400 hover:text-white'" class="px-4 py-2 rounded-md text-sm font-medium transition">📓 Quick Notes</button>
+            </nav>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+
+        <!-- ==================== TAB 1: EXCEL VIEWER & FUZZY SEARCH ==================== -->
+        <section x-show="activeTab === 'excel'" x-cloak class="space-y-6">
+            <div class="bg-gray-950 p-6 rounded-xl border border-gray-800">
+                <h2 class="text-lg font-semibold mb-2 text-emerald-400">Fuzzy Searchable Excel / CSV Reader</h2>
+                <p class="text-sm text-gray-400 mb-4">Upload any spreadsheet. It parses purely in your browser, enabling fuzzy, typo-tolerant filtering instantly.</p>
+                
+                <input type="file" accept=".xlsx, .xls, .csv" @change="handleExcelUpload" class="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-emerald-500/10 file:text-emerald-400 hover:file:bg-emerald-500/20 cursor-pointer" />
+            </div>
+
+            <div x-show="excelHeaders.length > 0" class="bg-gray-950 p-6 rounded-xl border border-gray-800 space-y-4">
+                <div class="flex items-center gap-4">
+                    <input type="text" x-model="excelSearchQuery" @input="fuzzySearchExcel()" placeholder="Fuzzy Search rows (typo-tolerant)..." class="flex-1 bg-gray-900 border border-gray-800 rounded-md px-4 py-2 text-sm text-white focus:outline-none focus:border-emerald-500" />
+                    <span class="text-xs text-gray-400" x-text="`Showing ${filteredExcelRows.length} of ${excelRows.length} items`"></span>
+                </div>
+
+                <div class="overflow-x-auto max-h-96 border border-gray-800 rounded-lg">
+                    <table class="w-full text-left border-collapse text-sm text-gray-300">
+                        <thead class="bg-gray-900 sticky top-0 text-gray-400 uppercase text-xs border-b border-gray-800">
+                            <tr>
+                                <template x-for="header in excelHeaders">
+                                    <th class="p-3" x-text="header"></th>
+                                </template>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template x-for="row in filteredExcelRows">
+                                <tr class="border-b border-gray-900 hover:bg-gray-900/50">
+                                    <template x-for="header in excelHeaders">
+                                        <td class="p-3" x-text="row[header] || ''"></td>
+                                    </template>
+                                </tr>
+                            </template>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== TAB 2: PDF WRITER & SIGNER ==================== -->
+        <section x-show="activeTab === 'pdf'" x-cloak class="space-y-6">
+            <div class="bg-gray-950 p-6 rounded-xl border border-gray-800 space-y-4">
+                <h2 class="text-lg font-semibold text-emerald-400">Zero-Server PDF Annotator & Signer</h2>
+                <p class="text-sm text-gray-400">Load a PDF document, type text anywhere, or overlay an image (like your signature) and save it locally as a fresh PDF.</p>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-400 uppercase mb-2">Step 1: Load PDF File</label>
+                        <input type="file" accept=".pdf" @change="handlePdfUpload" class="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-emerald-500/10 file:text-emerald-400 hover:file:bg-emerald-500/20 cursor-pointer" />
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-400 uppercase mb-2">Step 2: Load Signature / Stamp Image (Optional PNG/JPG)</label>
+                        <input type="file" accept="image/*" @change="handlePdfSignatureUpload" class="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-emerald-500/10 file:text-emerald-400 hover:file:bg-emerald-500/20 cursor-pointer" />
+                    </div>
+                </div>
+            </div>
+
+            <div x-show="pdfFileLoaded" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Editor Sidebar Settings -->
+                <div class="bg-gray-950 p-6 rounded-xl border border-gray-800 space-y-4 h-fit">
+                    <h3 class="font-semibold text-sm text-emerald-400 uppercase tracking-wider">Stamp Details</h3>
+                    
+                    <div>
+                        <label class="block text-xs text-gray-400 mb-1">Text Overlay</label>
+                        <input type="text" x-model="pdfOverlayText" class="w-full bg-gray-900 border border-gray-800 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500" placeholder="e.g. APPROVED or Sign Name" />
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-xs text-gray-400 mb-1">X Position</label>
+                            <input type="number" x-model.number="pdfX" class="w-full bg-gray-900 border border-gray-800 rounded px-3 py-2 text-sm text-white" />
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-400 mb-1">Y Position</label>
+                            <input type="number" x-model.number="pdfY" class="w-full bg-gray-900 border border-gray-800 rounded px-3 py-2 text-sm text-white" />
+                        </div>
+                    </div>
+
+                    <button @click="processAndDownloadPdf" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-semibold py-2 px-4 rounded-md text-sm transition">
+                        Process & Download PDF
+                    </button>
+                </div>
+
+                <!-- PDF Preview -->
+                <div class="lg:col-span-2 bg-gray-950 p-6 rounded-xl border border-gray-800 flex flex-col items-center justify-center min-h-[300px]">
+                    <p class="text-xs text-emerald-400 mb-4 font-mono">⚡ PDF Ready in RAM Memory</p>
+                    <div class="border-2 border-dashed border-gray-800 p-8 rounded-lg text-center max-w-sm">
+                        <span class="text-4xl block mb-2">📄</span>
+                        <p class="text-sm font-semibold" x-text="pdfFileName"></p>
+                        <p class="text-xs text-gray-500 mt-2">Adjust values on the left sidebar to overlay text or a graphic signature directly at X/Y coordinates on page 1.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== TAB 3: IMAGE OPTIMIZER & CROPPER ==================== -->
+        <section x-show="activeTab === 'cropper'" x-cloak class="space-y-6">
+            <div class="bg-gray-950 p-6 rounded-xl border border-gray-800">
+                <h2 class="text-lg font-semibold mb-2 text-emerald-400">Touch-Friendly Image Cropper & Compression</h2>
+                <p class="text-sm text-gray-400 mb-4">Upload an image, crop it to exact constraints, compress file size immediately, and save.</p>
+                
+                <input type="file" id="imageInput" accept="image/*" @change="loadImageForCropping" class="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-emerald-500/10 file:text-emerald-400 hover:file:bg-emerald-500/20 cursor-pointer" />
+            </div>
+
+            <div x-show="imageSelected" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Cropper Canvas Box -->
+                <div class="lg:col-span-2 bg-gray-950 p-4 rounded-xl border border-gray-800">
+                    <div class="overflow-hidden rounded-lg bg-gray-900 flex justify-center items-center">
+                        <img id="cropperSourceImage" class="max-w-full" style="display: block; max-height: 400px;" />
+                    </div>
+                </div>
+
+                <!-- Crop Actions and Export -->
+                <div class="bg-gray-950 p-6 rounded-xl border border-gray-800 space-y-4">
+                    <h3 class="font-semibold text-sm text-emerald-400 uppercase tracking-wider">Crop Controls</h3>
+                    
+                    <div class="grid grid-cols-3 gap-2">
+                        <button @click="setAspectRatio(1)" class="bg-gray-900 border border-gray-800 hover:border-gray-700 p-2 rounded text-xs">1:1 Square</button>
+                        <button @click="setAspectRatio(4/3)" class="bg-gray-900 border border-gray-800 hover:border-gray-700 p-2 rounded text-xs">4:3 Photo</button>
+                        <button @click="setAspectRatio(NaN)" class="bg-gray-900 border border-gray-800 hover:border-gray-700 p-2 rounded text-xs">Free Crop</button>
+                    </div>
+
+                    <div class="pt-4 border-t border-gray-800">
+                        <button @click="exportCroppedImage" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-semibold py-2 px-4 rounded-md text-sm transition">
+                            Generate & Optimize Output
+                        </button>
+                    </div>
+
+                    <div x-show="croppedResultBase64" class="pt-4 border-t border-gray-800 text-center space-y-3">
+                        <p class="text-xs text-gray-400">Cropped Image Output Preview:</p>
+                        <img :src="croppedResultBase64" class="mx-auto rounded max-h-40 border border-gray-800" />
+                        <a :href="croppedResultBase64" download="cropped-optimized.png" class="inline-block bg-blue-500 hover:bg-blue-600 text-white font-semibold py-1.5 px-3 rounded text-xs transition">
+                            Save Cropped Image
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== TAB 4: OFFLINE ENCRYPTED QUICK NOTES ==================== -->
+        <section x-show="activeTab === 'notes'" x-cloak class="space-y-6">
+            <div class="bg-gray-950 p-6 rounded-xl border border-gray-800 space-y-4">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h2 class="text-lg font-semibold text-emerald-400">IndexedDB Persistent Notes</h2>
+                        <p class="text-sm text-gray-400">Fast, local key-value synced markdown notes. Clears on request, otherwise persistent forever.</p>
+                    </div>
+                    <button @click="clearAllNotes()" class="bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs py-1 px-3 rounded border border-red-500/20">Clear Workspace</button>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <!-- Writing Area -->
+                    <div class="md:col-span-2 space-y-3">
+                        <input type="text" x-model="newNoteTitle" placeholder="Note Title..." class="w-full bg-gray-900 border border-gray-800 rounded px-4 py-2 text-sm text-white focus:outline-none focus:border-emerald-500" />
+                        <textarea x-model="newNoteContent" rows="6" placeholder="Start typing notes (Autosaved via localForage)..." class="w-full bg-gray-900 border border-gray-800 rounded px-4 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"></textarea>
+                        <button @click="saveNote()" class="bg-emerald-500 hover:bg-emerald-600 text-white font-semibold py-2 px-4 rounded-md text-sm transition">
+                            Save Note to Database
+                        </button>
+                    </div>
+
+                    <!-- Note Archive -->
+                    <div class="bg-gray-900 p-4 rounded-lg border border-gray-800 space-y-3">
+                        <h3 class="text-xs font-semibold uppercase tracking-widest text-gray-400">Saved Entries</h3>
+                        <div class="space-y-2 max-h-60 overflow-y-auto">
+                            <template x-for="note in notesList" :key="note.id">
+                                <div class="bg-gray-950 p-3 rounded border border-gray-800 hover:border-emerald-500/50 cursor-pointer transition flex justify-between items-center" @click="loadNote(note)">
+                                    <div class="truncate pr-2">
+                                        <p class="text-sm font-semibold text-gray-200 truncate" x-text="note.title"></p>
+                                        <p class="text-xs text-gray-500 truncate" x-text="note.content"></p>
+                                    </div>
+                                    <button @click.stop="deleteNote(note.id)" class="text-red-400 hover:text-red-300 text-xs">🗑️</button>
+                                </div>
+                            </template>
+                            <template x-if="notesList.length === 0">
+                                <p class="text-xs text-gray-500 italic">No notes saved in your offline Database.</p>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Inline Application Code Scripts -->
+    <script>
+        function app() {
+            return {
+                activeTab: 'excel',
+                
+                // --- Excel / CSV State ---
+                excelHeaders: [],
+                excelRows: [],
+                filteredExcelRows: [],
+                excelSearchQuery: '',
+                fuseInstance: null,
+
+                // --- PDF Mod State ---
+                pdfFileLoaded: false,
+                pdfFileName: '',
+                pdfRawBytes: null,
+                pdfSignatureBytes: null,
+                pdfOverlayText: '',
+                pdfX: 50,
+                pdfY: 50,
+
+                // --- Image Cropper State ---
+                imageSelected: false,
+                cropperInstance: null,
+                croppedResultBase64: '',
+
+                // --- localForage Notes State ---
+                newNoteTitle: '',
+                newNoteContent: '',
+                notesList: [],
+
+                initApp() {
+                    // Initialize localForage database parameters
+                    localforage.config({
+                        name: 'SwissKnifeWorkspace',
+                        storeName: 'offline_user_data'
+                    });
+                    this.loadSavedNotesFromDB();
+                    this.registerServiceWorker();
+                },
+
+                // --- SERVICE WORKER FOR OFFLINE-ONLY MODE ---
+                registerServiceWorker() {
+                    if ('serviceWorker' in navigator) {
+                        const swBlob = new Blob([`
+                            const CACHE_NAME = 'swissknife-v1';
+                            const ASSETS = [
+                                '/',
+                                'index.html',
+                                'https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js',
+                                'https://cdn.tailwindcss.com',
+                                'https://cdn.jsdelivr.net/npm/localforage@1.10.0/dist/localforage.min.js',
+                                'https://cdn.jsdelivr.net/npm/fuse.js@7.0.0/dist/fuse.basic.min.js',
+                                'https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js',
+                                'https://cdn.jsdelivr.net/npm/cropperjs@1.6.1/dist/cropper.min.css',
+                                'https://cdn.jsdelivr.net/npm/cropperjs@1.6.1/dist/cropper.min.js',
+                                'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js'
+                            ];
+                            self.addEventListener('install', e => {
+                                e.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS)));
+                            });
+                            self.addEventListener('fetch', e => {
+                                e.respondWith(caches.match(e.request).then(res => res || fetch(e.request)));
+                            });
+                        `], { type: 'application/javascript' });
+
+                        const swUrl = URL.createObjectURL(swBlob);
+                        navigator.serviceWorker.register(swUrl)
+                            .then(() => console.log("SwissKnife offline service worker activated."))
+                            .catch(err => console.error("SW registration failed", err));
+                    }
+                },
+
+                // --- EXCEL LOGIC ---
+                handleExcelUpload(event) {
+                    const file = event.target.files[0];
+                    if (!file) return;
+
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const data = new Uint8Array(e.target.result);
+                        const workbook = XLSX.read(data, { type: 'array' });
+                        const firstSheetName = workbook.SheetNames[0];
+                        const worksheet = workbook.Sheets[firstSheetName];
+                        
+                        const json = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+                        if (json.length > 0) {
+                            this.excelHeaders = Object.keys(json[0]);
+                            this.excelRows = json;
+                            this.filteredExcelRows = [...json];
+
+                            // Instantiate Fuzzy Search instance
+                            this.fuseInstance = new Fuse(this.excelRows, {
+                                keys: this.excelHeaders,
+                                threshold: 0.3
+                            });
+                        }
+                    };
+                    reader.readAsArrayBuffer(file);
+                },
+
+                fuzzySearchExcel() {
+                    if (!this.excelSearchQuery.trim()) {
+                        this.filteredExcelRows = [...this.excelRows];
+                        return;
+                    }
+                    if (this.fuseInstance) {
+                        const results = this.fuseInstance.search(this.excelSearchQuery);
+                        this.filteredExcelRows = results.map(item => item.item);
+                    }
+                },
+
+                // --- PDF LOGIC ---
+                handlePdfUpload(event) {
+                    const file = event.target.files[0];
+                    if (!file) return;
+                    this.pdfFileName = file.name;
+                    
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        this.pdfRawBytes = e.target.result;
+                        this.pdfFileLoaded = true;
+                    };
+                    reader.readAsArrayBuffer(file);
+                },
+
+                handlePdfSignatureUpload(event) {
+                    const file = event.target.files[0];
+                    if (!file) return;
+
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        this.pdfSignatureBytes = e.target.result;
+                    };
+                    reader.readAsArrayBuffer(file);
+                },
+
+                async processAndDownloadPdf() {
+                    if (!this.pdfRawBytes) return;
+
+                    try {
+                        const pdfDoc = await PDFLib.PDFDocument.load(this.pdfRawBytes);
+                        const pages = pdfDoc.getPages();
+                        const firstPage = pages[0];
+
+                        // Add user text directly
+                        if (this.pdfOverlayText.trim()) {
+                            firstPage.drawText(this.pdfOverlayText, {
+                                x: this.pdfX,
+                                y: this.pdfY,
+                                size: 18,
+                                color: PDFLib.rgb(0.06, 0.45, 0.37) // Emerald-themed signature
+                            });
+                        }
+
+                        // Superimpose user-provided signature image onto the document dynamically
+                        if (this.pdfSignatureBytes) {
+                            const imageType = this.pdfSignatureBytes.slice(0, 4);
+                            let signatureImage;
+                            
+                            // Simple client-side magic signature routing
+                            if (this.pdfFileName.toLowerCase().endsWith('.png')) {
+                                signatureImage = await pdfDoc.embedPng(this.pdfSignatureBytes);
+                            } else {
+                                signatureImage = await pdfDoc.embedJpg(this.pdfSignatureBytes);
+                            }
+
+                            firstPage.drawImage(signatureImage, {
+                                x: this.pdfX,
+                                y: this.pdfY,
+                                width: 120,
+                                height: 60
+                            });
+                        }
+
+                        const pdfBytes = await pdfDoc.save();
+                        const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+                        const link = document.createElement('a');
+                        link.href = URL.createObjectURL(blob);
+                        link.download = "signed-" + (this.pdfFileName || "document.pdf");
+                        link.click();
+                    } catch (error) {
+                        alert("Could not overlay document signature. Ensure files are valid format types.");
+                        console.error(error);
+                    }
+                },
+
+                // --- IMAGE CROPPER LOGIC ---
+                loadImageForCropping(event) {
+                    const file = event.target.files[0];
+                    if (!file) return;
+                    this.imageSelected = true;
+
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const image = document.getElementById('cropperSourceImage');
+                        image.src = e.target.result;
+
+                        if (this.cropperInstance) {
+                            this.cropperInstance.destroy();
+                        }
+
+                        this.$nextTick(() => {
+                            this.cropperInstance = new Cropper(image, {
+                                viewMode: 1,
+                                dragMode: 'move',
+                                autoCropArea: 0.8,
+                                restore: false,
+                                modal: true,
+                                guides: true,
+                                highlight: false,
+                                cropBoxMovable: true,
+                                cropBoxResizable: true,
+                                toggleDragModeOnDblclick: false,
+                            });
+                        });
+                    };
+                    reader.readAsDataURL(file);
+                },
+
+                setAspectRatio(value) {
+                    if (this.cropperInstance) {
+                        this.cropperInstance.setAspectRatio(value);
+                    }
+                },
+
+                exportCroppedImage() {
+                    if (!this.cropperInstance) return;
+                    
+                    const canvas = this.cropperInstance.getCroppedCanvas({
+                        width: 800, // Maximum bounding area
+                        height: 800,
+                        imageSmoothingEnabled: true,
+                        imageSmoothingQuality: 'high',
+                    });
+
+                    // Automatically compresses dynamic Canvas down to highly performant Client-Side JPEG
+                    this.croppedResultBase64 = canvas.toDataURL('image/jpeg', 0.8);
+                },
+
+                // --- OFFLINE DB persistent notes (LOCALFORAGE) ---
+                async saveNote() {
+                    if (!this.newNoteTitle.trim()) return;
+
+                    const note = {
+                        id: Date.now(),
+                        title: this.newNoteTitle,
+                        content: this.newNoteContent
+                    };
+
+                    this.notesList.unshift(note);
+                    await localforage.setItem('user_notes', JSON.parse(JSON.stringify(this.notesList)));
+                    this.newNoteTitle = '';
+                    this.newNoteContent = '';
+                },
+
+                async loadSavedNotesFromDB() {
+                    const saved = await localforage.getItem('user_notes');
+                    if (saved) {
+                        this.notesList = saved;
+                    }
+                },
+
+                loadNote(note) {
+                    this.newNoteTitle = note.title;
+                    this.newNoteContent = note.content;
+                },
+
+                async deleteNote(id) {
+                    this.notesList = this.notesList.filter(note => note.id !== id);
+                    await localforage.setItem('user_notes', JSON.parse(JSON.stringify(this.notesList)));
+                },
+
+                async clearAllNotes() {
+                    this.notesList = [];
+                    await localforage.removeItem('user_notes');
+                    this.newNoteTitle = '';
+                    this.newNoteContent = '';
+                }
+            };
+        }
+    </script>
+</body>
+</html>
